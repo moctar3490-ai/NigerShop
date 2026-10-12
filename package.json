@@ -1,13 +1,14 @@
 {
   "name": "nigershop",
   "version": "1.0.0",
-  "main": "app.js",
+  "description": "Marketplace nigérienne",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "npm rebuild sqlite3 --build-from-source"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["nigershop", "marketplace", "niger"],
+  "author": "Moctar Mamane",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -18,6 +19,5 @@
     "multer": "^2.4.0",
     "nodemailer": "^10.0.16",
     "sqlite3": "^6.0.1"
-  },
-  "description": ""
+  }
 }
