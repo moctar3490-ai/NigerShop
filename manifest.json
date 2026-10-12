@@ -1,0 +1,40 @@
+{
+  "name": "NigerShop — Marketplace Nigérienne",
+  "short_name": "NigerShop",
+  "description": "Le meilleur du commerce nigérien en ligne. Produits vérifiés, livraison rapide partout au Niger.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6b00",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["shopping", "business"],
+  "icons": [
+    {
+      "src": "/uploads/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/uploads/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catalogue",
+      "url": "/#catalogue",
+      "description": "Voir tous les produits"
+    },
+    {
+      "name": "Mon panier",
+      "url": "/#panier",
+      "description": "Voir mon panier"
+    }
+  ]
+}

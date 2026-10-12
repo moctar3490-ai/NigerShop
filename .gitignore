@@ -1,0 +1,29 @@
+# Dépendances
+node_modules/
+package-lock.json
+
+# Secrets (NE JAMAIS ENVOYER)
+.env
+.env.local
+.env.production
+
+# Base de données locale
+*.db
+nigershop.db
+
+# Uploads (images uploadées localement)
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+pm2-*.log
+
+# Sauvegardes locales
+*.bak
+*.old
+
+# OS
+.DS_Store
+Thumbs.db
