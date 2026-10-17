@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — NigerShop</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="icon" type="image/png" href="/uploads/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="container header-inner">
+    <div class="logo">
+      <span style="font-size:28px;">⚙️</span>
+      <span>Niger<strong>Shop Admin</strong></span>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="icon-btn" style="text-decoration:none;color:inherit;">🏠 Site</a>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Mode sombre / clair">🌙</button>
+      <button class="icon-btn" id="adminUserBtn">👤</button>
+    </div>
+  </div>
+</header>
+
+<div class="container" id="adminContent" style="display:none;">
+  <h2 class="section-title">Tableau de bord</h2>
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="admin-tabs">
+    <div class="admin-tab active" onclick="switchAdminTab(event,'produits')">📦 Produits</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'commandes')">🛒 Commandes</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'users')">👥 Utilisateurs</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'messages')">💬 Messages</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'commissions')">💰 Commissions</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'promo')">🎟️ Codes promo</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'avis')">⭐ Avis</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'messages-mod')">💬 Modération chat</div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div class="admin-panel active" id="panel-produits">
+    <div class="admin-section">
+      <h3 id="formTitle">➕ Ajouter un produit</h3>
+      <input type="hidden" id="pId">
+      <label>Nom du produit *</label>
+      <input id="pNom" placeholder="Ex: Smartphone Tecno">
+      <label>Description</label>
+      <textarea id="pDesc" placeholder="Description..."></textarea>
+      <div class="admin-row">
+        <div><label>Prix actuel (FCFA) *</label><input id="pPrix" type="number"></div>
+        <div><label>Ancien prix (FCFA) <small style="color:#999;">— optionnel</small></label><input id="pAncienPrix" type="number"></div>
+      </div>
+      <div class="admin-row">
+        <div><label>Stock</label><input id="pStock" type="number" value="0"></div>
+        <div></div>
+      </div>
+      <label>Catégorie</label>
+      <select id="pCat">
+        <option>Électronique</option><option>Alimentation</option>
+        <option>Mode</option><option>Textiles</option><option>Véhicules</option>
+        <option>Maison</option><option>Divers</option>
+      </select>
+      <label>Images (jusqu'à 10 photos)</label>
+      <input id="pImages" type="file" accept="image/*" multiple>
+      <button class="btn-primary" onclick="saveProduit()" style="width:100%;margin-top:10px;">💾 Enregistrer</button>
+      <button class="btn-secondary" onclick="resetForm()" style="width:100%;">Annuler</button>
+    </div>
+
+    <div class="admin-section">
+      <h3>📦 Produits existants</h3>
+      <div id="adminProductList"></div>
+    </div>
+  </div>
+
+  <!-- COMMANDES -->
+  <div class="admin-panel" id="panel-commandes">
+    <div class="admin-section">
+      <h3>🛒 Toutes les commandes</h3>
+      <div id="adminCommandeList"></div>
+    </div>
+  </div>
+
+  <!-- USERS -->
+  <div class="admin-panel" id="panel-users">
+    <div class="admin-section">
+      <h3>👥 Tous les utilisateurs</h3>
+      <div id="adminUserList"></div>
+    </div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div class="admin-panel" id="panel-messages">
+    <div class="admin-section">
+      <h3>💬 Toutes les conversations</h3>
+      <div id="adminMessageList"></div>
+    </div>
+  </div>
+
+  <!-- AVIS -->
+  <div class="admin-panel" id="panel-avis">
+    <div class="admin-section">
+      <h3>⭐ Tous les avis clients</h3>
+      <p style="color:#666;font-size:14px;margin-bottom:15px;">
+        Supprimez ou masquez les avis inappropriés.
+      </p>
+      <div id="adminAvisList"></div>
+    </div>
+  </div>
+
+  <!-- MODÉRATION CHAT -->
+  <div class="admin-panel" id="panel-messages-mod">
+    <div class="admin-section">
+      <h3>💬 Modération du chat</h3>
+      <p style="color:#666;font-size:14px;margin-bottom:15px;">
+        Tous les messages échangés sur la plateforme.
+      </p>
+      <div id="adminMessagesModList"></div>
+    </div>
+  </div>
+
+  <!-- PROMO -->
+  <div class="admin-panel" id="panel-promo">
+    <div class="admin-section">
+      <h3>➕ Créer un code promo</h3>
+      <label>Code (sera mis en majuscules) *</label>
+      <input id="promoCode" placeholder="Ex: PROMO10" style="text-transform:uppercase;">
+      <label>Type de réduction</label>
+      <select id="promoType">
+        <option value="pourcent">Pourcentage (%)</option>
+        <option value="fixe">Montant fixe (FCFA)</option>
+      </select>
+      <label>Valeur *</label>
+      <input id="promoValeur" type="number" placeholder="Ex: 10 ou 500">
+      <label>Montant minimum de commande (FCFA)</label>
+      <input id="promoMin" type="number" placeholder="0">
+      <label>Date d'expiration (optionnel)</label>
+      <input id="promoExpiration" type="date">
+      <button class="btn-primary" onclick="creerPromo()" style="width:100%;margin-top:10px;">✅ Créer le code</button>
+    </div>
+
+    <div class="admin-section">
+      <h3>📋 Codes promo existants</h3>
+      <div id="adminPromoList"></div>
+    </div>
+  </div>
+
+  <!-- COMMISSIONS -->
+  <div class="admin-panel" id="panel-commissions">
+    <div class="admin-section">
+      <h3>💰 Commissions de parrainage</h3>
+      <div id="adminCommissionList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN ADMIN -->
+<div class="container" id="loginBox" style="max-width:450px;margin-top:80px;">
+  <div class="admin-section">
+    <h2>🔐 Connexion Admin</h2>
+    <input id="loginEmail" type="email" placeholder="Email admin">
+    <input id="loginPass" type="password" placeholder="Mot de passe">
+    <button class="btn-primary" onclick="adminLogin()" style="width:100%;">Se connecter</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ==================== CONFIG ====================
+const API = window.location.origin + '/api';
+let token = localStorage.getItem('token');
+let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let editingId = null;
+let produitsCache = [];
+
+// ==================== UTILS ====================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._t); window._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+function fmt(n) { return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'; }
+
+// ==================== AUTH ====================
+async function adminLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const mot_de_passe = document.getElementById('loginPass').value;
+  const res = await fetch(`${API}/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, mot_de_passe })
+  });
+  const data = await res.json();
+  if (!res.ok) return showToast('❌ ' + data.message);
+  if (data.user.role !== 'admin') return showToast('❌ Pas administrateur');
+  token = data.token; currentUser = data.user;
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(currentUser));
+  initAdmin();
+}
+
+function initAdmin() {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  document.getElementById('adminUserBtn').textContent = `👤 ${currentUser.nom}`;
+  loadStats(); loadProduits(); loadCommandes(); loadUsers();
+  loadMessages(); loadCommissions(); loadPromos();
+}
+
+function logoutAdmin() {
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  location.reload();
+}
+document.getElementById('adminUserBtn').onclick = logoutAdmin;
+
+// ==================== TABS ====================
+function switchAdminTab(e, tab) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  e.target.classList.add('active');
+  const panel = document.getElementById('panel-' + tab);
+  if (panel) panel.classList.add('active');
+
+  if (tab === 'avis') loadAvis();
+  if (tab === 'messages-mod') loadMessagesMod();
+}
+
+// ==================== STATS ====================
+async function loadStats() {
+  const res = await fetch(`${API}/admin/stats`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const s = await res.json();
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><h3>${s.users}</h3><p>Utilisateurs</p></div>
+    <div class="stat-card"><h3>${s.produits}</h3><p>Produits</p></div>
+    <div class="stat-card"><h3>${s.commandes}</h3><p>Commandes</p></div>
+    <div class="stat-card"><h3>${fmt(s.ca)}</h3><p>Chiffre d'affaires</p></div>
+  `;
+}
+
+// ==================== PRODUITS ====================
+async function loadProduits() {
+  const res = await fetch(`${API}/produits`);
+  const list = await res.json();
+  produitsCache = list;
+
+  document.getElementById('adminProductList').innerHTML = list.map(p => `
+    <div class="admin-list-item">
+      <div style="display:flex;gap:10px;align-items:center;">
+        ${p.images && p.images[0] ? `<img src="${p.images[0]}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;">` : '📦'}
+        <div>
+          <strong>${p.nom}</strong> — ${fmt(p.prix)}
+          ${p.ancien_prix ? `<span style="color:#999;text-decoration:line-through;margin-left:6px;">${fmt(p.ancien_prix)}</span>` : ''}
+          <br>
+          <small style="color:#666;">${p.categorie} · Stock: ${p.stock} · ${(p.images && p.images.length) || 0} photo(s)</small>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-primary btn-sm" onclick="editProduitParId(${p.id})">✏️ Modifier</button>
+        <button class="del-btn" onclick="supprimerProduit(${p.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('') || '<p>Aucun produit.</p>';
+}
+
+async function editProduitParId(id) {
+  let p = produitsCache.find(x => x.id === id);
+  if (!p) {
+    const res = await fetch(`${API}/produits`);
+    produitsCache = await res.json();
+    p = produitsCache.find(x => x.id === id);
+  }
+  if (!p) return showToast('❌ Produit introuvable');
+
+  editingId = p.id;
+  document.getElementById('formTitle').textContent = '✏️ Modifier le produit #' + p.id;
+  document.getElementById('pNom').value = p.nom || '';
+  document.getElementById('pDesc').value = p.description || '';
+  document.getElementById('pPrix').value = p.prix || '';
+  document.getElementById('pAncienPrix').value = p.ancien_prix || '';
+  document.getElementById('pStock').value = p.stock || 0;
+  document.getElementById('pCat').value = p.categorie || 'Divers';
+  document.getElementById('pImages').value = '';
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById('formTitle').textContent = '➕ Ajouter un produit';
+  ['pNom','pDesc','pPrix','pAncienPrix','pStock','pImages'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('pCat').value = 'Électronique';
+}
+
+async function saveProduit() {
+  const nom = document.getElementById('pNom').value.trim();
+  const prix = document.getElementById('pPrix').value;
+  if (!nom || !prix) return showToast('⚠️ Nom et prix requis');
+
+  const fd = new FormData();
+  fd.append('nom', nom);
+  fd.append('description', document.getElementById('pDesc').value);
+  fd.append('prix', prix);
+  fd.append('ancien_prix', document.getElementById('pAncienPrix').value || '');
+  fd.append('stock', document.getElementById('pStock').value || 0);
+  fd.append('categorie', document.getElementById('pCat').value);
+
+  const files = document.getElementById('pImages').files;
+  for (const f of files) fd.append('images', f);
+
+  const url = editingId ? `${API}/produits/${editingId}` : `${API}/produits`;
+  const method = editingId ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method, headers: { 'Authorization': 'Bearer ' + token }, body: fd
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast('❌ ' + (data.message || 'Erreur'));
+
+    showToast(editingId ? '✅ Produit modifié' : '✅ Produit ajouté');
+    resetForm();
+    await loadProduits();
+  } catch (err) {
+    console.error(err);
+    showToast('❌ Erreur réseau');
+  }
+}
+
+async function supprimerProduit(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  const res = await fetch(`${API}/produits/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadProduits(); }
+}
+
+// ==================== COMMANDES ====================
+async function loadCommandes() {
+  const res = await fetch(`${API}/commandes`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminCommandeList').innerHTML = list.map(c => `
+    <div class="admin-list-item">
+      <div style="flex:1;">
+        <strong>#${c.id}</strong> — ${fmt(c.total)} · <span style="color:#ff6b00;">${c.statut}</span>
+        ${c.code_promo ? `<span style="background:#0a8754;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">🎟️ ${c.code_promo}</span>` : ''}
+        <br>
+        <small>${c.client_nom} (${c.client_email}) · ${c.telephone}</small><br>
+        <small>${c.ville_livraison} · ${c.transport} · ${c.paiement}</small><br>
+        <small style="color:#999;">${new Date(c.created_at).toLocaleString('fr-FR')}</small>
+        <div style="margin-top:6px;font-size:13px;color:#666;">
+          ${c.articles.map(a => `• ${a.nom} ×${a.qty}`).join('<br>')}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <select onchange="updateStatut(${c.id}, this.value)" style="padding:6px;border-radius:6px;">
+          <option value="en_attente" ${c.statut==='en_attente'?'selected':''}>En attente</option>
+          <option value="confirmee" ${c.statut==='confirmee'?'selected':''}>Confirmée</option>
+          <option value="expediee" ${c.statut==='expediee'?'selected':''}>Expédiée</option>
+          <option value="livree" ${c.statut==='livree'?'selected':''}>Livrée</option>
+          <option value="annulee" ${c.statut==='annulee'?'selected':''}>Annulée</option>
+        </select>
+        <a href="mailto:${c.client_email}?subject=Commande #${c.id}" class="btn-secondary btn-sm" style="text-decoration:none;text-align:center;">📧</a>
+        <button class="del-btn" onclick="supprimerCommande(${c.id})">🗑️ Supprimer</button>
+      </div>
+    </div>
+  `).join('') || '<p>Aucune commande.</p>';
+}
+
+async function supprimerCommande(id) {
+  if (!confirm('Supprimer cette commande ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/commandes/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimée'); loadCommandes(); }
+  else showToast('❌ Erreur');
+}
+
+async function updateStatut(id, statut) {
+  const res = await fetch(`${API}/commandes/${id}/statut`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ statut })
+  });
+  if (res.ok) showToast('✅ Statut mis à jour');
+}
+
+// ==================== UTILISATEURS ====================
+async function loadUsers() {
+  const res = await fetch(`${API}/admin/users`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminUserList').innerHTML = list.length ? list.map(u => `
+    <div class="admin-list-item">
+      <div style="flex:1;">
+        <strong>${u.nom}</strong>
+        ${u.verifie ? '✅' : '⏳'}
+        <span style="color:#ff6b00;font-size:12px;">[${u.role}]</span>
+        ${u.bloque ? '<span style="background:#d32f2f;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">BANNI</span>' : ''}
+        <br>
+        <small>${u.email} · ${u.telephone || 'N/A'} · ${u.ville || 'N/A'}</small><br>
+        <small style="color:#666;">Code parrain : <strong>${u.code_parrain || 'N/A'}</strong></small>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-primary btn-sm" onclick="voirDetailsUser(${u.id})">👁️ Détails</button>
+        <button class="btn-primary btn-sm" onclick="ouvrirModifUser(${u.id})">✏️</button>
+        ${u.role === 'vendeur' && !u.verifie
+          ? `<button class="btn-primary btn-sm" onclick="verifierUser(${u.id})">✅</button>` : ''}
+        <button class="btn-secondary btn-sm" style="background:${u.bloque ? '#0a8754' : '#ffb400'};color:#fff;border:none;"
+                onclick="toggleBloquerUser(${u.id}, ${u.bloque})">
+          ${u.bloque ? '🔓 Débannir' : '🚫 Bannir'}
+        </button>
+        <a href="mailto:${u.email}" class="btn-secondary btn-sm" style="text-decoration:none;">📧</a>
+        <button class="del-btn" onclick="supprimerUser(${u.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('') : '<p>Aucun utilisateur.</p>';
+}
+
+async function toggleBloquerUser(id, estBloque) {
+  let motif = null;
+  if (!estBloque) {
+    motif = prompt('Motif du bannissement (optionnel) :');
+    if (motif === null) return;
+  }
+  const res = await fetch(`${API}/admin/users/${id}/bloquer`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ motif })
+  });
+  const data = await res.json();
+  if (res.ok) { showToast('✅ ' + data.message); loadUsers(); }
+  else showToast('❌ ' + data.message);
+}
+
+async function voirDetailsUser(id) {
+  const res = await fetch(`${API}/admin/users/${id}/details`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const d = await res.json();
+  if (!res.ok) return showToast('❌ Erreur');
+
+  const u = d.user;
+  const html = `
+    <div style="max-width:600px;">
+      <h3>👤 ${u.nom}</h3>
+      <p><strong>Email :</strong> ${u.email}</p>
+      <p><strong>Téléphone :</strong> ${u.telephone || 'N/A'}</p>
+      <p><strong>Ville :</strong> ${u.ville || 'N/A'}</p>
+      <p><strong>Rôle :</strong> ${u.role}</p>
+      <p><strong>Statut :</strong> ${u.bloque ? '🚫 BANNI' : '✅ Actif'} ${u.verifie ? '· ✔️ Vérifié' : ''}</p>
+      <hr style="margin:15px 0;">
+      <h4>📦 Commandes (${d.commandes.length})</h4>
+      ${d.commandes.length ? d.commandes.map(c => `<div>#${c.id} — ${fmt(c.total)} · ${c.statut}</div>`).join('') : '<p style="color:#666;">Aucune</p>'}
+      <hr style="margin:15px 0;">
+      <h4>⭐ Avis (${d.avis.length})</h4>
+      ${d.avis.length ? d.avis.map(a => `<div>${'★'.repeat(a.note)} — ${a.produit_nom || '?'}</div>`).join('') : '<p style="color:#666;">Aucun</p>'}
+    </div>
+  `;
+  ouvrirModalCustom('👁️ Détails utilisateur', html);
+}
+
+async function ouvrirModifUser(id) {
+  const res = await fetch(`${API}/admin/users`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  const u = list.find(x => x.id === id);
+  if (!u) return showToast('❌ Utilisateur introuvable');
+
+  const html = `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input id="mNom" value="${u.nom || ''}" placeholder="Nom">
+      <input id="mEmail" value="${u.email || ''}" placeholder="Email">
+      <input id="mTel" value="${u.telephone || ''}" placeholder="Téléphone">
+      <input id="mVille" value="${u.ville || ''}" placeholder="Ville">
+      <select id="mRole">
+        <option value="client" ${u.role==='client'?'selected':''}>Client</option>
+        <option value="vendeur" ${u.role==='vendeur'?'selected':''}>Vendeur</option>
+        <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+      </select>
+      <label style="display:flex;gap:6px;align-items:center;">
+        <input type="checkbox" id="mVerifie" ${u.verifie ? 'checked' : ''}> Vérifié
+      </label>
+      <button class="btn-primary" onclick="submitModifUser(${u.id})">💾 Enregistrer</button>
+    </div>
+  `;
+  ouvrirModalCustom('✏️ Modifier l\'utilisateur', html);
+}
+
+async function submitModifUser(id) {
+  const payload = {
+    nom: document.getElementById('mNom').value.trim(),
+    email: document.getElementById('mEmail').value.trim(),
+    telephone: document.getElementById('mTel').value.trim(),
+    ville: document.getElementById('mVille').value.trim(),
+    role: document.getElementById('mRole').value,
+    verifie: document.getElementById('mVerifie').checked
+  };
+  const res = await fetch(`${API}/admin/users/${id}/modifier`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showToast('✅ Utilisateur modifié');
+    fermerModalCustom();
+    loadUsers();
+  } else showToast('❌ ' + data.message);
+}
+
+async function verifierUser(id) {
+  const res = await fetch(`${API}/admin/users/${id}/verifier`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Vérifié'); loadUsers(); }
+}
+
+async function supprimerUser(id) {
+  if (!confirm('Supprimer cet utilisateur ?')) return;
+  const res = await fetch(`${API}/admin/users/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadUsers(); }
+}
+
+// ==================== MODALE GÉNÉRIQUE ====================
+function ouvrirModalCustom(titre, contenu) {
+  let modal = document.getElementById('customModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'customModal';
+    modal.className = 'modal open';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close" onclick="fermerModalCustom()">×</span>
+        <h2 id="customModalTitle"></h2>
+        <div id="customModalBody"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.classList.add('open');
+  document.getElementById('customModalTitle').textContent = titre;
+  document.getElementById('customModalBody').innerHTML = contenu;
+}
+
+function fermerModalCustom() {
+  const modal = document.getElementById('customModal');
+  if (modal) modal.classList.remove('open');
+}
+
+// ==================== MESSAGES (vue simple) ====================
+async function loadMessages() {
+  const res = await fetch(`${API}/messages`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminMessageList').innerHTML = list.length ? list.map(m => `
+    <div class="admin-list-item">
+      <div>
+        <strong>${m.exp_nom} → ${m.dest_nom}</strong><br>
+        <span>${m.contenu}</span><br>
+        <small style="color:#999;">${new Date(m.created_at).toLocaleString('fr-FR')}</small>
+      </div>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucun message.</p>';
+}
+
+// ==================== MODÉRATION AVIS ====================
+async function loadAvis() {
+  const res = await fetch(`${API}/admin/avis`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+
+  document.getElementById('adminAvisList').innerHTML = list.length ? list.map(a => {
+    const stars = '★'.repeat(a.note) + '☆'.repeat(5 - a.note);
+    return `
+      <div class="admin-list-item">
+        <div style="flex:1;">
+          <div>
+            <span class="stars">${stars}</span>
+            <strong style="margin-left:10px;">${a.user_nom || 'Utilisateur supprimé'}</strong>
+            <small style="color:#999;margin-left:6px;">(${a.user_email || '—'})</small>
+            ${a.masque ? '<span style="background:#999;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">MASQUÉ</span>' : ''}
+          </div>
+          <div style="margin:6px 0;font-size:13px;color:#666;">
+            Sur le produit : <strong>${a.produit_nom || 'Produit supprimé'}</strong>
+          </div>
+          <div style="background:#f5f5f5;padding:10px;border-radius:6px;margin-top:6px;">
+            ${a.texte}
+          </div>
+          <small style="color:#999;">${new Date(a.created_at).toLocaleString('fr-FR')}</small>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn-secondary btn-sm" onclick="toggleMasquerAvis(${a.id})">
+            ${a.masque ? '👁️ Afficher' : '🙈 Masquer'}
+          </button>
+          <button class="del-btn" onclick="supprimerAvis(${a.id})">🗑️ Supprimer</button>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p style="color:#666;">Aucun avis.</p>';
+}
+
+async function toggleMasquerAvis(id) {
+  const res = await fetch(`${API}/admin/avis/${id}/masquer`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Modifié'); loadAvis(); }
+  else showToast('❌ Erreur');
+}
+
+async function supprimerAvis(id) {
+  if (!confirm('Supprimer cet avis ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/avis/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Avis supprimé'); loadAvis(); }
+  else showToast('❌ Erreur');
+}
+
+// ==================== MODÉRATION CHAT ====================
+async function loadMessagesMod() {
+  const res = await fetch(`${API}/admin/messages`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+
+  document.getElementById('adminMessagesModList').innerHTML = list.length ? list.map(m => `
+    <div class="admin-list-item">
+      <div style="flex:1;">
+        <div style="font-size:13px;">
+          <strong>${m.exp_nom || 'Utilisateur supprimé'}</strong>
+          <small style="color:#999;">(${m.exp_email || '—'})</small>
+          <span style="color:#ff6b00;margin:0 8px;">→</span>
+          <strong>${m.dest_nom || 'Utilisateur supprimé'}</strong>
+          <small style="color:#999;">(${m.dest_email || '—'})</small>
+        </div>
+        <div style="background:#f5f5f5;padding:10px;border-radius:6px;margin-top:6px;">
+          ${m.contenu}
+        </div>
+        <small style="color:#999;">
+          ${new Date(m.created_at).toLocaleString('fr-FR')}
+          ${m.lu ? '· ✅ Lu' : '· ⏳ Non lu'}
+        </small>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn-secondary btn-sm" style="background:#ffb400;color:#fff;border:none;"
+                onclick="toggleBloquerUser(${m.expediteur_id}, false)">
+          🚫 Bloquer exp.
+        </button>
+        <button class="del-btn" onclick="supprimerMessageMod(${m.id})">🗑️ Suppr.</button>
+      </div>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucun message.</p>';
+}
+
+async function supprimerMessageMod(id) {
+  if (!confirm('Supprimer ce message ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/messages/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Message supprimé'); loadMessagesMod(); }
+  else showToast('❌ Erreur');
+}
+
+// ==================== COMMISSIONS ====================
+async function loadCommissions() {
+  const res = await fetch(`${API}/admin/commissions`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminCommissionList').innerHTML = list.length ? list.map(c => `
+    <div class="admin-list-item">
+      <span><strong>${c.user_nom}</strong> — Niveau ${c.niveau} · <span style="color:#0a8754;font-weight:700;">${fmt(c.montant)}</span></span>
+      <small style="color:#999;">${new Date(c.created_at).toLocaleDateString('fr-FR')}</small>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucune commission.</p>';
+}
+
+// ==================== CODES PROMO ====================
+async function creerPromo() {
+  const code = document.getElementById('promoCode').value.trim();
+  const type = document.getElementById('promoType').value;
+  const valeur = parseFloat(document.getElementById('promoValeur').value);
+  const min_commande = parseFloat(document.getElementById('promoMin').value) || 0;
+  const date_expiration = document.getElementById('promoExpiration').value || null;
+
+  if (!code || !valeur) return showToast('⚠️ Code et valeur requis');
+
+  const res = await fetch(`${API}/admin/promo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ code, type, valeur, min_commande, date_expiration })
+  });
+  const data = await res.json();
+  if (!res.ok) return showToast('❌ ' + data.message);
+
+  showToast('✅ Code promo créé !');
+  document.getElementById('promoCode').value = '';
+  document.getElementById('promoValeur').value = '';
+  document.getElementById('promoMin').value = '';
+  document.getElementById('promoExpiration').value = '';
+  loadPromos();
+}
+
+async function loadPromos() {
+  const res = await fetch(`${API}/admin/promo`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminPromoList').innerHTML = list.length ? list.map(p => {
+    const valeurAff = p.type === 'pourcent' ? `${p.valeur}%` : fmt(p.valeur);
+    return `
+      <div class="admin-list-item">
+        <div>
+          <strong style="font-size:1.2rem;color:#ff6b00;">${p.code}</strong>
+          <span style="margin-left:10px;">-${valeurAff}</span>
+          ${p.min_commande > 0 ? `<small style="color:#666;"> (min. ${fmt(p.min_commande)})</small>` : ''}
+          <span style="margin-left:10px;font-size:12px;background:${p.actif ? '#0a8754' : '#999'};color:#fff;padding:2px 8px;border-radius:10px;">
+            ${p.actif ? 'Actif' : 'Inactif'}
+          </span>
+          <br>
+          <small style="color:#666;">Utilisé ${p.nb_utilisations || 0} fois</small>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-secondary btn-sm" onclick="togglePromo(${p.id})">
+            ${p.actif ? '⏸️ Désactiver' : '▶️ Activer'}
+          </button>
+          <button class="del-btn" onclick="supprimerPromo(${p.id})">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p>Aucun code promo.</p>';
+}
+
+async function togglePromo(id) {
+  const res = await fetch(`${API}/admin/promo/${id}/toggle`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Modifié'); loadPromos(); }
+}
+
+async function supprimerPromo(id) {
+  if (!confirm('Supprimer ce code ?')) return;
+  const res = await fetch(`${API}/admin/promo/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadPromos(); }
+}
+
+// ==================== DARK MODE ====================
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  const btn = document.getElementById('themeBtn');
+  if (theme === 'dark') {
+    document.body.classList.add('dark');
+    if (btn) btn.textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark');
+    if (btn) btn.textContent = '🌙';
+  }
+  localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+}
+
+// ==================== INIT ====================
+initTheme();
+if (token && currentUser && currentUser.role === 'admin') initAdmin();
+</script>
+</body>
+</html>

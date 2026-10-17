@@ -20,7 +20,18 @@
     <div class="header-actions">
       <a href="index.html" class="icon-btn" style="text-decoration:none;color:inherit;">🏠 Site</a>
       <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Mode sombre / clair">🌙</button>
-      <button class="icon-btn" id="adminUserBtn">👤</button>
+      <div class="user-menu-container" id="adminUserMenuContainer" style="position:relative;">
+  <button class="icon-btn" id="adminUserBtn" onclick="toggleAdminUserMenu()">👤</button>
+  <div class="user-dropdown" id="adminUserDropdown" style="display:none;">
+    <div class="user-dropdown-header">
+      <strong id="adminUserName">Administrateur</strong>
+      <small id="adminUserEmail">nigershop.ne@gmail.com</small>
+    </div>
+    <a onclick="closeAdminUserMenu();openAdminPasswordModal()">🔐 Changer mon mot de passe</a>
+    <div class="user-dropdown-divider"></div>
+    <a onclick="closeAdminUserMenu();logoutAdmin()" style="color:#d32f2f;">🚪 Déconnexion</a>
+  </div>
+</div>
     </div>
   </div>
 </header>
@@ -36,6 +47,8 @@
     <div class="admin-tab" onclick="switchAdminTab(event,'messages')">💬 Messages</div>
     <div class="admin-tab" onclick="switchAdminTab(event,'commissions')">💰 Commissions</div>
     <div class="admin-tab" onclick="switchAdminTab(event,'promo')">🎟️ Codes promo</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'avis')">⭐ Avis</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'messages-mod')">💬 Modération chat</div>
   </div>
 
   <!-- PRODUITS -->
@@ -49,12 +62,12 @@
       <textarea id="pDesc" placeholder="Description..."></textarea>
       <div class="admin-row">
         <div><label>Prix actuel (FCFA) *</label><input id="pPrix" type="number"></div>
-        <div><label>Ancien prix (FCFA) <small style="color:#999;">— optionnel, pour afficher une promo</small></label><input id="pAncienPrix" type="number"></div>
+        <div><label>Ancien prix (FCFA) <small style="color:#999;">— optionnel</small></label><input id="pAncienPrix" type="number"></div>
       </div>
-    <div class="admin-row">
-      <div><label>Stock</label><input id="pStock" type="number" value="0"></div>
-      <div></div>
-    </div>
+      <div class="admin-row">
+        <div><label>Stock</label><input id="pStock" type="number" value="0"></div>
+        <div></div>
+      </div>
       <label>Catégorie</label>
       <select id="pCat">
         <option>Électronique</option><option>Alimentation</option>
@@ -96,7 +109,30 @@
       <div id="adminMessageList"></div>
     </div>
   </div>
-    <!-- PROMO -->
+
+  <!-- AVIS -->
+  <div class="admin-panel" id="panel-avis">
+    <div class="admin-section">
+      <h3>⭐ Tous les avis clients</h3>
+      <p style="color:#666;font-size:14px;margin-bottom:15px;">
+        Supprimez ou masquez les avis inappropriés.
+      </p>
+      <div id="adminAvisList"></div>
+    </div>
+  </div>
+
+  <!-- MODÉRATION CHAT -->
+  <div class="admin-panel" id="panel-messages-mod">
+    <div class="admin-section">
+      <h3>💬 Modération du chat</h3>
+      <p style="color:#666;font-size:14px;margin-bottom:15px;">
+        Tous les messages échangés sur la plateforme.
+      </p>
+      <div id="adminMessagesModList"></div>
+    </div>
+  </div>
+
+  <!-- PROMO -->
   <div class="admin-panel" id="panel-promo">
     <div class="admin-section">
       <h3>➕ Créer un code promo</h3>
@@ -108,7 +144,7 @@
         <option value="fixe">Montant fixe (FCFA)</option>
       </select>
       <label>Valeur *</label>
-      <input id="promoValeur" type="number" placeholder="Ex: 10 (pour 10%) ou 500 (pour 500 FCFA)">
+      <input id="promoValeur" type="number" placeholder="Ex: 10 ou 500">
       <label>Montant minimum de commande (FCFA)</label>
       <input id="promoMin" type="number" placeholder="0">
       <label>Date d'expiration (optionnel)</label>
@@ -131,6 +167,52 @@
   </div>
 </div>
 
+<!-- MODAL CHANGER MOT DE PASSE ADMIN -->
+<div id="adminPasswordModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeAdminPasswordModal()">×</span>
+    <h2>🔐 Changer mon mot de passe admin</h2>
+    <p style="color:#666;font-size:14px;margin-bottom:20px;">
+      Pour des raisons de sécurité, saisissez votre mot de passe actuel puis le nouveau.
+    </p>
+
+    <div class="form-group">
+      <label>Mot de passe actuel *</label>
+      <div class="password-wrapper">
+        <input type="password" id="adminCurrentPass" placeholder="Mot de passe actuel">
+        <button type="button" class="password-toggle" onclick="togglePassword('adminCurrentPass', this)" title="Afficher">👁️</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Nouveau mot de passe *</label>
+      <div class="password-wrapper">
+        <input type="password" id="adminNewPass" placeholder="Minimum 12 caractères">
+        <button type="button" class="password-toggle" onclick="togglePassword('adminNewPass', this)" title="Afficher">👁️</button>
+      </div>
+      <small class="hint">🔒 Minimum 12 caractères · Majuscules + minuscules + chiffres + symboles</small>
+    </div>
+
+    <div class="form-group">
+      <label>Confirmer le nouveau mot de passe *</label>
+      <div class="password-wrapper">
+        <input type="password" id="adminConfirmPass" placeholder="Retaper le mot de passe">
+        <button type="button" class="password-toggle" onclick="togglePassword('adminConfirmPass', this)" title="Afficher">👁️</button>
+      </div>
+    </div>
+
+    <div id="adminPasswordMessage" style="margin-bottom:12px;font-size:14px;"></div>
+
+    <button class="btn-primary" onclick="submitAdminPasswordChange()" style="width:100%;">
+      ✅ Valider le changement
+    </button>
+    <button class="btn-secondary" onclick="closeAdminPasswordModal()" style="width:100%;margin-top:8px;">
+      Annuler
+    </button>
+  </div>
+</div>
+
+
 <!-- LOGIN ADMIN -->
 <div class="container" id="loginBox" style="max-width:450px;margin-top:80px;">
   <div class="admin-section">
@@ -144,11 +226,14 @@
 <div id="toast" class="toast"></div>
 
 <script>
+// ==================== CONFIG ====================
 const API = window.location.origin + '/api';
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
 let editingId = null;
+let produitsCache = [];
 
+// ==================== UTILS ====================
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -156,6 +241,7 @@ function showToast(msg) {
 }
 function fmt(n) { return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'; }
 
+// ==================== AUTH ====================
 async function adminLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const mot_de_passe = document.getElementById('loginPass').value;
@@ -176,22 +262,159 @@ function initAdmin() {
   document.getElementById('loginBox').style.display = 'none';
   document.getElementById('adminContent').style.display = 'block';
   document.getElementById('adminUserBtn').textContent = `👤 ${currentUser.nom}`;
-  loadStats(); loadProduits(); loadCommandes(); loadUsers(); loadMessages(); loadCommissions(); loadPromos();
+  loadStats(); loadProduits(); loadCommandes(); loadUsers();
+  loadMessages(); loadCommissions(); loadPromos();
 }
 
+// ----------------------- modifié --------------------------
+ // ==================== MENU ADMIN ====================
+function toggleAdminUserMenu() {
+  const menu = document.getElementById('adminUserDropdown');
+  if (!menu) return;
+  menu.style.display = (menu.style.display === 'none' || menu.style.display === '') ? 'block' : 'none';
+}
+
+function closeAdminUserMenu() {
+  const menu = document.getElementById('adminUserDropdown');
+  if (menu) menu.style.display = 'none';
+}
+
+// Fermer le menu au clic ailleurs
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('adminUserMenuContainer');
+  if (container && !container.contains(e.target)) {
+    closeAdminUserMenu();
+  }
+});
+
+// ==================== CHANGER MDP ADMIN ====================
+function openAdminPasswordModal() {
+  // Remplir les infos utilisateur
+  const nameEl = document.getElementById('adminUserName');
+  const emailEl = document.getElementById('adminUserEmail');
+  if (nameEl && currentUser) nameEl.textContent = currentUser.nom;
+  if (emailEl && currentUser) emailEl.textContent = currentUser.email;
+
+  // Vider les champs
+  document.getElementById('adminCurrentPass').value = '';
+  document.getElementById('adminNewPass').value = '';
+  document.getElementById('adminConfirmPass').value = '';
+  document.getElementById('adminPasswordMessage').textContent = '';
+
+  document.getElementById('adminPasswordModal').classList.add('open');
+}
+
+function closeAdminPasswordModal() {
+  document.getElementById('adminPasswordModal').classList.remove('open');
+}
+
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
+
+async function submitAdminPasswordChange() {
+  const ancien = document.getElementById('adminCurrentPass').value;
+  const nouveau = document.getElementById('adminNewPass').value;
+  const confirm = document.getElementById('adminConfirmPass').value;
+  const msgEl = document.getElementById('adminPasswordMessage');
+
+  msgEl.textContent = '';
+
+  // Validations
+  if (!ancien || !nouveau || !confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Remplissez tous les champs';
+    return;
+  }
+
+  if (nouveau.length < 12) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit contenir au moins 12 caractères';
+    return;
+  }
+
+  if (nouveau !== confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Les deux mots de passe ne correspondent pas';
+    return;
+  }
+
+  if (ancien === nouveau) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit être différent';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/user/changer-mot-de-passe`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        ancien_mot_de_passe: ancien,
+        nouveau_mot_de_passe: nouveau
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      return;
+    }
+
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = '✅ ' + data.message;
+    showToast('🔐 Mot de passe admin changé avec succès');
+
+    document.getElementById('adminCurrentPass').value = '';
+    document.getElementById('adminNewPass').value = '';
+    document.getElementById('adminConfirmPass').value = '';
+
+    setTimeout(() => {
+      closeAdminPasswordModal();
+    }, 2000);
+  } catch (err) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+  }
+}
+
+// ----------------------- modifié --------------------------
 function logoutAdmin() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
   location.reload();
 }
-document.getElementById('adminUserBtn').onclick = logoutAdmin;
 
+// NOTE : le clic sur adminUserBtn ouvre maintenant un menu (voir toggleAdminUserMenu)
+// L'ancienne ligne "document.getElementById('adminUserBtn').onclick = logoutAdmin;" a été retirée
+// pour permettre l'ouverture du menu au clic.
+
+// ==================== TABS ====================
 function switchAdminTab(e, tab) {
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
   e.target.classList.add('active');
-  document.getElementById('panel-' + tab).classList.add('active');
+  const panel = document.getElementById('panel-' + tab);
+  if (panel) panel.classList.add('active');
+
+  if (tab === 'avis') loadAvis();
+  if (tab === 'messages-mod') loadMessagesMod();
 }
 
+// ==================== STATS ====================
 async function loadStats() {
   const res = await fetch(`${API}/admin/stats`, { headers: { 'Authorization': 'Bearer ' + token }});
   const s = await res.json();
@@ -203,10 +426,11 @@ async function loadStats() {
   `;
 }
 
+// ==================== PRODUITS ====================
 async function loadProduits() {
   const res = await fetch(`${API}/produits`);
   const list = await res.json();
-  produitsCache = list; // garder en mémoire pour editProduitParId
+  produitsCache = list;
 
   document.getElementById('adminProductList').innerHTML = list.map(p => `
     <div class="admin-list-item">
@@ -227,26 +451,15 @@ async function loadProduits() {
   `).join('') || '<p>Aucun produit.</p>';
 }
 
-// Cache global des produits chargés, pour retrouver facilement par ID
-let produitsCache = [];
-
 async function editProduitParId(id) {
-  // Cherche dans le cache, sinon recharge
   let p = produitsCache.find(x => x.id === id);
-
-  // Si pas trouvé, recharge la liste
   if (!p) {
     const res = await fetch(`${API}/produits`);
     produitsCache = await res.json();
     p = produitsCache.find(x => x.id === id);
   }
+  if (!p) return showToast('❌ Produit introuvable');
 
-  if (!p) {
-    showToast('❌ Produit introuvable');
-    return;
-  }
-
-  // Remplir le formulaire
   editingId = p.id;
   document.getElementById('formTitle').textContent = '✏️ Modifier le produit #' + p.id;
   document.getElementById('pNom').value = p.nom || '';
@@ -255,13 +468,7 @@ async function editProduitParId(id) {
   document.getElementById('pAncienPrix').value = p.ancien_prix || '';
   document.getElementById('pStock').value = p.stock || 0;
   document.getElementById('pCat').value = p.categorie || 'Divers';
-  document.getElementById('pImages').value = ''; // vider le champ file
-
-  // Petit indicateur : combien d'images existent déjà
-  const nbImages = (p.images && p.images.length) || 0;
-  if (nbImages > 0) {
-    showToast(`ℹ️ ${nbImages} image(s) existante(s). Choisis-en de nouvelles pour les remplacer.`);
-  }
+  document.getElementById('pImages').value = '';
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -297,11 +504,8 @@ async function saveProduit() {
 
   try {
     const res = await fetch(url, {
-      method,
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: fd
+      method, headers: { 'Authorization': 'Bearer ' + token }, body: fd
     });
-
     const data = await res.json();
     if (!res.ok) return showToast('❌ ' + (data.message || 'Erreur'));
 
@@ -322,13 +526,16 @@ async function supprimerProduit(id) {
   if (res.ok) { showToast('🗑️ Supprimé'); loadProduits(); }
 }
 
+// ==================== COMMANDES ====================
 async function loadCommandes() {
   const res = await fetch(`${API}/commandes`, { headers: { 'Authorization': 'Bearer ' + token }});
   const list = await res.json();
   document.getElementById('adminCommandeList').innerHTML = list.map(c => `
     <div class="admin-list-item">
-      <div>
-        <strong>#${c.id}</strong> — ${fmt(c.total)} · <span style="color:#ff6b00;">${c.statut}</span><br>
+      <div style="flex:1;">
+        <strong>#${c.id}</strong> — ${fmt(c.total)} · <span style="color:#ff6b00;">${c.statut}</span>
+        ${c.code_promo ? `<span style="background:#0a8754;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">🎟️ ${c.code_promo}</span>` : ''}
+        <br>
         <small>${c.client_nom} (${c.client_email}) · ${c.telephone}</small><br>
         <small>${c.ville_livraison} · ${c.transport} · ${c.paiement}</small><br>
         <small style="color:#999;">${new Date(c.created_at).toLocaleString('fr-FR')}</small>
@@ -344,10 +551,20 @@ async function loadCommandes() {
           <option value="livree" ${c.statut==='livree'?'selected':''}>Livrée</option>
           <option value="annulee" ${c.statut==='annulee'?'selected':''}>Annulée</option>
         </select>
-        <a href="mailto:${c.client_email}?subject=Commande #${c.id}" class="btn-secondary btn-sm" style="text-decoration:none;text-align:center;">📧 Email</a>
+        <a href="mailto:${c.client_email}?subject=Commande #${c.id}" class="btn-secondary btn-sm" style="text-decoration:none;text-align:center;">📧</a>
+        <button class="del-btn" onclick="supprimerCommande(${c.id})">🗑️ Supprimer</button>
       </div>
     </div>
   `).join('') || '<p>Aucune commande.</p>';
+}
+
+async function supprimerCommande(id) {
+  if (!confirm('Supprimer cette commande ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/commandes/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimée'); loadCommandes(); }
+  else showToast('❌ Erreur');
 }
 
 async function updateStatut(id, statut) {
@@ -359,24 +576,224 @@ async function updateStatut(id, statut) {
   if (res.ok) showToast('✅ Statut mis à jour');
 }
 
-async function loadUsers() {
+// ==================== UTILISATEURS ====================
+// --------------------modifié ---------
+  async function loadUsers() {
+  const res = await fetch(`${API}/admin/users`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const list = await res.json();
+  document.getElementById('adminUserList').innerHTML = list.length ? list.map(u => {
+    // Calcul de la durée depuis le bannissement
+    let dureeTxt = '';
+    if (u.bloque && u.date_blocage) {
+      const ms = Date.now() - new Date(u.date_blocage).getTime();
+      const heures = Math.floor(ms / (1000 * 60 * 60));
+      const jours = Math.floor(heures / 24);
+      if (jours > 0) dureeTxt = `il y a ${jours} jour${jours > 1 ? 's' : ''}`;
+      else if (heures > 0) dureeTxt = `il y a ${heures} h`;
+      else dureeTxt = 'à l\'instant';
+    }
+
+    return `
+      <div class="admin-list-item" style="${u.bloque ? 'background:rgba(211,47,47,0.05);border-left:4px solid #d32f2f;' : ''}">
+        <div style="flex:1;">
+          <strong>${u.nom}</strong>
+          ${u.verifie ? '✅' : '⏳'}
+          <span style="color:#ff6b00;font-size:12px;">[${u.role}]</span>
+          <br>
+          <small>${u.email} · ${u.telephone || 'N/A'} · ${u.ville || 'N/A'}</small><br>
+          <small style="color:#666;">Code parrain : <strong>${u.code_parrain || 'N/A'}</strong></small>
+
+          ${u.bloque ? `
+            <div style="margin-top:8px;padding:8px;background:#d32f2f;color:#fff;border-radius:6px;font-size:12px;">
+              <strong>🚫 COMPTE BANNI</strong> ${dureeTxt ? `<span style="opacity:0.9;">(${dureeTxt})</span>` : ''}
+              <br>
+              <span style="font-size:11px;opacity:0.95;">
+                📋 Motif : <em>${u.motif_blocage || 'Non précisé'}</em>
+              </span>
+              ${u.date_blocage ? `<br><span style="font-size:11px;opacity:0.85;">📅 Le ${new Date(u.date_blocage).toLocaleString('fr-FR')}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="btn-primary btn-sm" onclick="voirDetailsUser(${u.id})">👁️ Détails</button>
+          <button class="btn-primary btn-sm" onclick="ouvrirModifUser(${u.id})">✏️</button>
+          ${u.role === 'vendeur' && !u.verifie
+            ? `<button class="btn-primary btn-sm" onclick="verifierUser(${u.id})">✅</button>` : ''}
+          <button class="btn-secondary btn-sm"
+                  style="background:${u.bloque ? '#0a8754' : '#ffb400'};color:#fff;border:none;"
+                  onclick="toggleBloquerUser(${u.id}, ${u.bloque})">
+            ${u.bloque ? '🔓 Débannir' : '🚫 Bannir'}
+          </button>
+          <a href="mailto:${u.email}" class="btn-secondary btn-sm" style="text-decoration:none;">📧</a>
+          <button class="del-btn" onclick="supprimerUser(${u.id})">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p>Aucun utilisateur.</p>';
+}
+// -------------------- modifié -----------------------
+async function toggleBloquerUser(id, estBloque) {
+  let motif = null;
+  if (!estBloque) {
+    motif = prompt('Motif du bannissement (optionnel) :');
+    if (motif === null) return;
+  }
+  const res = await fetch(`${API}/admin/users/${id}/bloquer`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ motif })
+  });
+  const data = await res.json();
+  if (res.ok) { showToast('✅ ' + data.message); loadUsers(); }
+  else showToast('❌ ' + data.message);
+}
+
+// -----------  modifié --------------
+  async function voirDetailsUser(id) {
+  const res = await fetch(`${API}/admin/users/${id}/details`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const d = await res.json();
+  if (!res.ok) return showToast('❌ Erreur');
+
+  const u = d.user;
+
+  // Calcul durée bannissement
+  let dureeTxt = '';
+  if (u.bloque && u.date_blocage) {
+    const ms = Date.now() - new Date(u.date_blocage).getTime();
+    const heures = Math.floor(ms / (1000 * 60 * 60));
+    const jours = Math.floor(heures / 24);
+    if (jours > 0) dureeTxt = `${jours} jour${jours > 1 ? 's' : ''}`;
+    else if (heures > 0) dureeTxt = `${heures} heure${heures > 1 ? 's' : ''}`;
+    else dureeTxt = 'moins d\'une heure';
+  }
+
+  // Bloc statut (banni ou actif)
+  const statutBloc = u.bloque ? `
+    <div style="background:linear-gradient(135deg, #d32f2f, #b71c1c);color:#fff;padding:15px;border-radius:10px;margin:15px 0;">
+      <div style="font-size:1.3rem;font-weight:700;margin-bottom:10px;">🚫 COMPTE BANNI</div>
+      <div style="background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;margin-top:10px;">
+        <div style="margin-bottom:6px;"><strong>📋 Motif :</strong></div>
+        <div style="font-style:italic;font-size:14px;margin-bottom:10px;">${u.motif_blocage || 'Non précisé'}</div>
+        ${u.date_blocage ? `
+          <div style="font-size:13px;opacity:0.9;">
+            📅 <strong>Banni le :</strong> ${new Date(u.date_blocage).toLocaleString('fr-FR')}
+          </div>
+          <div style="font-size:13px;opacity:0.9;margin-top:4px;">
+            ⏱️ <strong>Durée :</strong> ${dureeTxt}
+          </div>
+        ` : ''}
+      </div>
+      <button class="btn-primary" style="width:100%;margin-top:12px;background:#fff;color:#d32f2f;font-weight:700;"
+              onclick="toggleBloquerUser(${u.id}, true)">
+        🔓 Débannir cet utilisateur
+      </button>
+    </div>
+  ` : `
+    <div style="background:#0a8754;color:#fff;padding:12px;border-radius:8px;margin:15px 0;text-align:center;">
+      ✅ Compte actif ${u.verifie ? '· Vérifié' : ''}
+    </div>
+    <button class="btn-secondary btn-sm" style="width:100%;background:#ffb400;color:#fff;border:none;"
+            onclick="toggleBloquerUser(${u.id}, false)">
+      🚫 Bannir cet utilisateur
+    </button>
+  `;
+
+  const html = `
+    <div style="max-width:600px;">
+      <h3 style="margin-bottom:10px;">👤 ${u.nom}</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px;margin-bottom:10px;">
+        <div><strong>📧 Email :</strong> ${u.email}</div>
+        <div><strong>📞 Téléphone :</strong> ${u.telephone || 'N/A'}</div>
+        <div><strong>📍 Ville :</strong> ${u.ville || 'N/A'}</div>
+        <div><strong>🎭 Rôle :</strong> ${u.role}</div>
+        <div><strong>🔑 Code parrain :</strong> ${u.code_parrain || 'N/A'}</div>
+        <div><strong>📅 Inscrit le :</strong> ${new Date(u.created_at).toLocaleDateString('fr-FR')}</div>
+      </div>
+
+      ${statutBloc}
+
+      <hr style="margin:15px 0;">
+      <h4>📦 Commandes (${d.commandes.length})</h4>
+      ${d.commandes.length
+        ? d.commandes.map(c => `<div style="padding:6px 0;border-bottom:1px solid #eee;">
+            <strong>#${c.id}</strong> — ${fmt(c.total)} · <span style="color:#ff6b00;">${c.statut}</span>
+            <small style="color:#999;margin-left:8px;">${new Date(c.created_at).toLocaleDateString('fr-FR')}</small>
+          </div>`).join('')
+        : '<p style="color:#666;font-size:13px;">Aucune commande</p>'}
+
+      <hr style="margin:15px 0;">
+      <h4>⭐ Avis (${d.avis.length})</h4>
+      ${d.avis.length
+        ? d.avis.map(a => `<div style="padding:6px 0;border-bottom:1px solid #eee;">
+            <span class="stars">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)}</span>
+            <strong style="margin-left:8px;">${a.produit_nom || '?'}</strong>
+            <div style="font-size:12px;color:#666;margin-top:4px;">${(a.texte || '').slice(0, 80)}...</div>
+          </div>`).join('')
+        : '<p style="color:#666;font-size:13px;">Aucun avis</p>'}
+
+      <hr style="margin:15px 0;">
+      <h4>🕓 Activité récente</h4>
+      ${d.historique.length
+        ? d.historique.slice(0, 5).map(h => `<div style="padding:4px 0;font-size:13px;color:#666;">
+            • ${h.action} — ${h.produit_nom || '?'} <small style="color:#999;">(${new Date(h.created_at).toLocaleDateString('fr-FR')})</small>
+          </div>`).join('')
+        : '<p style="color:#666;font-size:13px;">Aucune activité</p>'}
+    </div>
+  `;
+  ouvrirModalCustom('👁️ Détails utilisateur', html);
+}
+// ----------  modifié
+
+async function ouvrirModifUser(id) {
   const res = await fetch(`${API}/admin/users`, { headers: { 'Authorization': 'Bearer ' + token }});
   const list = await res.json();
-  document.getElementById('adminUserList').innerHTML = list.map(u => `
-    <div class="admin-list-item">
-      <div>
-        <strong>${u.nom}</strong> ${u.verifie ? '✅' : '⏳'} <span style="color:#ff6b00;font-size:12px;">[${u.role}]</span><br>
-        <small>${u.email} · ${u.telephone || 'N/A'} · ${u.ville || 'N/A'}</small><br>
-        <small style="color:#666;">Code parrain : <strong>${u.code_parrain || 'N/A'}</strong></small>
-      </div>
-      <div style="display:flex;gap:6px;">
-        ${u.role === 'vendeur' && !u.verifie
-          ? `<button class="btn-primary btn-sm" onclick="verifierUser(${u.id})">✅ Vérifier</button>` : ''}
-        <a href="mailto:${u.email}" class="btn-secondary btn-sm" style="text-decoration:none;">📧</a>
-        <button class="del-btn" onclick="supprimerUser(${u.id})">🗑️</button>
-      </div>
+  const u = list.find(x => x.id === id);
+  if (!u) return showToast('❌ Utilisateur introuvable');
+
+  const html = `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input id="mNom" value="${u.nom || ''}" placeholder="Nom">
+      <input id="mEmail" value="${u.email || ''}" placeholder="Email">
+      <input id="mTel" value="${u.telephone || ''}" placeholder="Téléphone">
+      <input id="mVille" value="${u.ville || ''}" placeholder="Ville">
+      <select id="mRole">
+        <option value="client" ${u.role==='client'?'selected':''}>Client</option>
+        <option value="vendeur" ${u.role==='vendeur'?'selected':''}>Vendeur</option>
+        <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+      </select>
+      <label style="display:flex;gap:6px;align-items:center;">
+        <input type="checkbox" id="mVerifie" ${u.verifie ? 'checked' : ''}> Vérifié
+      </label>
+      <button class="btn-primary" onclick="submitModifUser(${u.id})">💾 Enregistrer</button>
     </div>
-  `).join('');
+  `;
+  ouvrirModalCustom('✏️ Modifier l\'utilisateur', html);
+}
+
+async function submitModifUser(id) {
+  const payload = {
+    nom: document.getElementById('mNom').value.trim(),
+    email: document.getElementById('mEmail').value.trim(),
+    telephone: document.getElementById('mTel').value.trim(),
+    ville: document.getElementById('mVille').value.trim(),
+    role: document.getElementById('mRole').value,
+    verifie: document.getElementById('mVerifie').checked
+  };
+  const res = await fetch(`${API}/admin/users/${id}/modifier`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showToast('✅ Utilisateur modifié');
+    fermerModalCustom();
+    loadUsers();
+  } else showToast('❌ ' + data.message);
 }
 
 async function verifierUser(id) {
@@ -394,6 +811,33 @@ async function supprimerUser(id) {
   if (res.ok) { showToast('🗑️ Supprimé'); loadUsers(); }
 }
 
+// ==================== MODALE GÉNÉRIQUE ====================
+function ouvrirModalCustom(titre, contenu) {
+  let modal = document.getElementById('customModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'customModal';
+    modal.className = 'modal open';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close" onclick="fermerModalCustom()">×</span>
+        <h2 id="customModalTitle"></h2>
+        <div id="customModalBody"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.classList.add('open');
+  document.getElementById('customModalTitle').textContent = titre;
+  document.getElementById('customModalBody').innerHTML = contenu;
+}
+
+function fermerModalCustom() {
+  const modal = document.getElementById('customModal');
+  if (modal) modal.classList.remove('open');
+}
+
+// ==================== MESSAGES (vue simple) ====================
 async function loadMessages() {
   const res = await fetch(`${API}/messages`, { headers: { 'Authorization': 'Bearer ' + token }});
   const list = await res.json();
@@ -408,6 +852,102 @@ async function loadMessages() {
   `).join('') : '<p style="color:#666;">Aucun message.</p>';
 }
 
+// ==================== MODÉRATION AVIS ====================
+async function loadAvis() {
+  const res = await fetch(`${API}/admin/avis`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+
+  document.getElementById('adminAvisList').innerHTML = list.length ? list.map(a => {
+    const stars = '★'.repeat(a.note) + '☆'.repeat(5 - a.note);
+    return `
+      <div class="admin-list-item">
+        <div style="flex:1;">
+          <div>
+            <span class="stars">${stars}</span>
+            <strong style="margin-left:10px;">${a.user_nom || 'Utilisateur supprimé'}</strong>
+            <small style="color:#999;margin-left:6px;">(${a.user_email || '—'})</small>
+            ${a.masque ? '<span style="background:#999;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">MASQUÉ</span>' : ''}
+          </div>
+          <div style="margin:6px 0;font-size:13px;color:#666;">
+            Sur le produit : <strong>${a.produit_nom || 'Produit supprimé'}</strong>
+          </div>
+          <div style="background:#f5f5f5;padding:10px;border-radius:6px;margin-top:6px;">
+            ${a.texte}
+          </div>
+          <small style="color:#999;">${new Date(a.created_at).toLocaleString('fr-FR')}</small>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn-secondary btn-sm" onclick="toggleMasquerAvis(${a.id})">
+            ${a.masque ? '👁️ Afficher' : '🙈 Masquer'}
+          </button>
+          <button class="del-btn" onclick="supprimerAvis(${a.id})">🗑️ Supprimer</button>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p style="color:#666;">Aucun avis.</p>';
+}
+
+async function toggleMasquerAvis(id) {
+  const res = await fetch(`${API}/admin/avis/${id}/masquer`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Modifié'); loadAvis(); }
+  else showToast('❌ Erreur');
+}
+
+async function supprimerAvis(id) {
+  if (!confirm('Supprimer cet avis ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/avis/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Avis supprimé'); loadAvis(); }
+  else showToast('❌ Erreur');
+}
+
+// ==================== MODÉRATION CHAT ====================
+async function loadMessagesMod() {
+  const res = await fetch(`${API}/admin/messages`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+
+  document.getElementById('adminMessagesModList').innerHTML = list.length ? list.map(m => `
+    <div class="admin-list-item">
+      <div style="flex:1;">
+        <div style="font-size:13px;">
+          <strong>${m.exp_nom || 'Utilisateur supprimé'}</strong>
+          <small style="color:#999;">(${m.exp_email || '—'})</small>
+          <span style="color:#ff6b00;margin:0 8px;">→</span>
+          <strong>${m.dest_nom || 'Utilisateur supprimé'}</strong>
+          <small style="color:#999;">(${m.dest_email || '—'})</small>
+        </div>
+        <div style="background:#f5f5f5;padding:10px;border-radius:6px;margin-top:6px;">
+          ${m.contenu}
+        </div>
+        <small style="color:#999;">
+          ${new Date(m.created_at).toLocaleString('fr-FR')}
+          ${m.lu ? '· ✅ Lu' : '· ⏳ Non lu'}
+        </small>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn-secondary btn-sm" style="background:#ffb400;color:#fff;border:none;"
+                onclick="toggleBloquerUser(${m.expediteur_id}, false)">
+          🚫 Bloquer exp.
+        </button>
+        <button class="del-btn" onclick="supprimerMessageMod(${m.id})">🗑️ Suppr.</button>
+      </div>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucun message.</p>';
+}
+
+async function supprimerMessageMod(id) {
+  if (!confirm('Supprimer ce message ? Action irréversible.')) return;
+  const res = await fetch(`${API}/admin/messages/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Message supprimé'); loadMessagesMod(); }
+  else showToast('❌ Erreur');
+}
+
+// ==================== COMMISSIONS ====================
 async function loadCommissions() {
   const res = await fetch(`${API}/admin/commissions`, { headers: { 'Authorization': 'Bearer ' + token }});
   const list = await res.json();
@@ -446,14 +986,10 @@ async function creerPromo() {
 }
 
 async function loadPromos() {
-  const res = await fetch(`${API}/admin/promo`, {
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
+  const res = await fetch(`${API}/admin/promo`, { headers: { 'Authorization': 'Bearer ' + token }});
   const list = await res.json();
   document.getElementById('adminPromoList').innerHTML = list.length ? list.map(p => {
     const valeurAff = p.type === 'pourcent' ? `${p.valeur}%` : fmt(p.valeur);
-    const expire = p.date_expiration
-      ? `<small style="color:#999;">Expire le ${new Date(p.date_expiration).toLocaleDateString('fr-FR')}</small>` : '';
     return `
       <div class="admin-list-item">
         <div>
@@ -465,7 +1001,6 @@ async function loadPromos() {
           </span>
           <br>
           <small style="color:#666;">Utilisé ${p.nb_utilisations || 0} fois</small>
-          ${expire ? ' · ' + expire : ''}
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn-secondary btn-sm" onclick="togglePromo(${p.id})">
@@ -492,6 +1027,7 @@ async function supprimerPromo(id) {
   });
   if (res.ok) { showToast('🗑️ Supprimé'); loadPromos(); }
 }
+
 // ==================== DARK MODE ====================
 function initTheme() {
   const saved = localStorage.getItem('theme');
@@ -517,9 +1053,8 @@ function toggleTheme() {
   applyTheme(isDark ? 'light' : 'dark');
 }
 
+// ==================== INIT ====================
 initTheme();
-
-// INIT
 if (token && currentUser && currentUser.role === 'admin') initAdmin();
 </script>
 </body>

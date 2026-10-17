@@ -27,3 +27,7 @@ pm2-*.log
 # OS
 .DS_Store
 Thumbs.db
+.env
+node_modules/
+nigershop.db*
+uploads/*

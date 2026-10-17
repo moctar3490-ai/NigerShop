@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NigerShop — Marketplace Multiproduits</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NigerShop">
+<link rel="apple-touch-icon" href="/uploads/icon-192.png">
+<link rel="icon" type="image/png" href="/uploads/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="container header-inner">
+    <div class="logo" onclick="showPage('home')">
+      <span style="font-size:28px;">🛍️</span>
+      <span>Niger<strong>Shop</strong></span>
+    </div>
+
+    <nav class="nav">
+      <a onclick="showPage('home')">Accueil</a>
+      <a onclick="showPage('catalogue')">Catalogue</a>
+      <a onclick="showPage('partenariat')">Partenariat</a>
+      <a onclick="showPage('transport')">Livraison</a>
+      <a onclick="showPage('messages')" id="navMessages" style="display:none;">Messages</a>
+      <a onclick="showPage('commandes')" id="navCommandes" style="display:none;">Mes commandes</a>
+    </nav>
+
+    <button class="burger" onclick="toggleMobileMenu()">☰</button>
+
+    <div class="header-actions">
+      <input type="text" id="searchInput" placeholder="🔍 Rechercher..." class="search-input">
+      <button class="icon-btn" onclick="showPage('panier')">🛒 <span id="cartCount" class="badge">0</span></button>
+      <button class="icon-btn" onclick="showPage('favoris')" title="Favoris">❤️</button>
+      <button class="icon-btn" onclick="showPage('historique')" title="Historique">🕓</button>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Mode sombre / clair">🌙</button>
+      <div class="user-menu-container" id="userMenuContainer">
+        <button class="icon-btn" id="authBtn" onclick="handleAuthBtn()">👤 Connexion</button>
+        <div class="user-dropdown" id="userDropdown" style="display:none;">
+          <div class="user-dropdown-header" id="userDropdownHeader"></div>
+          <a onclick="closeUserMenu();showPage('commandes')">📦 Mes commandes</a>
+          <a onclick="closeUserMenu();showPage('favoris')">❤️ Mes favoris</a>
+          <a onclick="closeUserMenu();showPage('historique')">🕓 Mon historique</a>
+          <a onclick="closeUserMenu();showPage('messages')">💬 Mes messages</a>
+          <a onclick="closeUserMenu();showPage('partenariat')">🤝 Parrainage</a>
+          <div class="user-dropdown-divider"></div>
+          <a id="adminLink" onclick="closeUserMenu();window.location.href='/admin.html'" style="display:none;color:#ff6b00;font-weight:700;">⚙️ Tableau de bord admin</a>
+          <a onclick="closeUserMenu();logout()" style="color:#d32f2f;">🚪 Déconnexion</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Menu mobile (drawer) -->
+<div class="mobile-menu" id="mobileMenu" onclick="closeMobileMenu(event)">
+  <div class="mobile-menu-panel" onclick="event.stopPropagation()">
+    <button class="mobile-menu-close" onclick="closeMobileMenu()">×</button>
+    <a onclick="closeMobileMenu();showPage('home')">🏠 Accueil</a>
+    <a onclick="closeMobileMenu();showPage('catalogue')">🛍️ Catalogue</a>
+    <a onclick="closeMobileMenu();showPage('partenariat')">🤝 Partenariat</a>
+    <a onclick="closeMobileMenu();showPage('transport')">🚚 Livraison</a>
+    <a onclick="closeMobileMenu();showPage('panier')">🛒 Panier</a>
+    <a onclick="closeMobileMenu();showPage('favoris')">❤️ Favoris</a>
+    <a onclick="closeMobileMenu();showPage('historique')">🕓 Historique</a>
+    <a onclick="closeMobileMenu();showPage('commandes')" id="mobNavCommandes" style="display:none;">📦 Mes commandes</a>
+    <a onclick="closeMobileMenu();showPage('messages')" id="mobNavMessages" style="display:none;">💬 Messages</a>
+    <a onclick="closeMobileMenu();openAuth()">👤 Connexion / Inscription</a>
+  </div>
+</div>
+
+<!-- ACCUEIL -->
+<section id="page-home" class="page active">
+  <div class="hero">
+    <div class="container">
+      <h1>Le meilleur du commerce nigérien, en ligne.</h1>
+      <p>Des milliers de produits, livrés partout au Niger.</p>
+      <button class="btn-primary" onclick="showPage('catalogue')">Explorer le catalogue →</button>
+    </div>
+  </div>
+  <div class="container features">
+    <div class="feature-card"><div class="feature-icon">🚚</div><h3>Livraison Nationale</h3><p>Toutes les grandes compagnies du Niger.</p></div>
+    <div class="feature-card"><div class="feature-icon">💳</div><h3>Paiement Mobile</h3><p>Nita & Amana Transfert acceptés.</p></div>
+    <div class="feature-card"><div class="feature-icon">✅</div><h3>Vendeurs Vérifiés</h3><p>Chaque fournisseur est validé.</p></div>
+    <div class="feature-card"><div class="feature-icon">📞</div><h3>Support Direct</h3><p>Chat, WhatsApp et Appel.</p></div>
+  </div>
+  <div class="container">
+    <h2 class="section-title">Produits populaires</h2>
+    <div id="homeProducts" class="products-grid"></div>
+  </div>
+</section>
+
+<!-- CATALOGUE -->
+<section id="page-catalogue" class="page">
+  <div class="container catalogue-layout">
+    <aside class="filters">
+      <h3>🔎 Filtres</h3>
+      <div class="filter-group"><label>Catégorie</label>
+        <select id="filterCategorie"><option value="tous">Toutes</option>
+          <option>Électronique</option><option>Alimentation</option>
+          <option>Mode</option><option>Textiles</option><option>Véhicules</option>
+          <option>Maison</option><option>Divers</option>
+        </select></div>
+      <div class="filter-group"><label>Prix min (FCFA)</label><input type="number" id="filterPrixMin" placeholder="0"></div>
+      <div class="filter-group"><label>Prix max (FCFA)</label><input type="number" id="filterPrixMax" placeholder="1000000"></div>
+      <div class="filter-group"><label>Trier par</label>
+        <select id="filterTri"><option value="default">Par défaut</option>
+          <option value="asc">Prix croissant</option>
+          <option value="desc">Prix décroissant</option>
+          <option value="nom">Nom (A-Z)</option>
+        </select></div>
+      <button class="btn-primary" onclick="applyFilters()">Appliquer</button>
+      <button class="btn-secondary" onclick="resetFilters()">Réinitialiser</button>
+    </aside>
+    <main>
+      <h2 class="section-title">Catalogue complet</h2>
+      <div id="catalogueProducts" class="products-grid"></div>
+    </main>
+  </div>
+</section>
+
+<!-- DETAIL PRODUIT -->
+<section id="page-produit" class="page">
+  <div class="container" id="produitDetail"></div>
+</section>
+
+<!-- PARTENARIAT -->
+<section id="page-partenariat" class="page">
+  <div class="container">
+    <h2 class="section-title">🤝 Devenir Partenaire Fournisseur</h2>
+    <p class="section-sub">Rejoignez notre réseau et bénéficiez d'un système de parrainage rémunérateur.</p>
+    <div class="partenariat-grid">
+      <div class="plan-card">
+        <h3>🌱 Starter</h3><div class="price">Gratuit</div>
+        <ul><li>✅ Jusqu'à 10 produits</li><li>✅ Commission 8% / vente</li><li>✅ Support WhatsApp</li></ul>
+        <button class="btn-primary" onclick="openAuth('vendeur')">Commencer</button>
+      </div>
+      <div class="plan-card featured">
+        <div class="tag">POPULAIRE</div>
+        <h3>🚀 Pro</h3>
+        <div class="price">15 000 FCFA/mois</div>
+        <ul><li>✅ Produits illimités</li><li>✅ Commission 5% / vente</li>
+          <li>✅ Badge "Vendeur Vérifié"</li><li>✅ Parrainage rémunéré</li></ul>
+        <button class="btn-primary" onclick="openAuth('vendeur')">Choisir Pro</button>
+      </div>
+      <div class="plan-card">
+        <h3>🏢 Entreprise</h3><div class="price">Sur devis</div>
+        <ul><li>✅ Tout le plan Pro</li><li>✅ Commission négociée</li>
+          <li>✅ Account manager dédié</li></ul>
+        <button class="btn-primary" onclick="contactWhatsApp()">Nous contacter</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>💰 Système de Parrainage (MLM à 2 niveaux)</h3>
+      <p style="color:#666;margin-top:10px;">
+        Invitez vos amis avec votre code unique et gagnez des commissions :<br>
+        • <strong>3%</strong> sur chaque commande de vos filleuls directs (Niveau 1)<br>
+        • <strong>1%</strong> sur chaque commande de leurs filleuls (Niveau 2)
+      </p>
+      <div id="monCodeParrain" style="margin-top:15px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- TRANSPORT -->
+<section id="page-transport" class="page">
+  <div class="container">
+    <h2 class="section-title">🚚 Nos partenaires de transport</h2>
+    <div class="transport-grid">
+      <div class="transport-card"><h3>STM</h3><p>Réseau national</p></div>
+      <div class="transport-card"><h3>RIMBO</h3><p>Niamey, Maradi, Zinder</p></div>
+      <div class="transport-card"><h3>AMANA</h3><p>Couverture nationale</p></div>
+      <div class="transport-card"><h3>SONITRAV</h3><p>Agadez, Tahoua</p></div>
+      <div class="transport-card"><h3>SONEF</h3><p>Niamey express</p></div>
+      <div class="transport-card"><h3>NIZAR</h3><p>Régions Sud</p></div>
+    </div>
+    <h2 class="section-title" style="margin-top:60px;">💳 Modes de paiement</h2>
+    <div class="transport-grid">
+      <div class="transport-card"><h3>Nita Transfert</h3><p>Paiement mobile instantané.</p></div>
+      <div class="transport-card"><h3>Amana Transfert</h3><p>Transfert sécurisé.</p></div>
+      <div class="transport-card"><h3>À la livraison</h3><p>Selon la ville.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PANIER -->
+<section id="page-panier" class="page">
+  <div class="container">
+    <h2 class="section-title">🛒 Mon Panier</h2>
+    <div id="cartItems" class="cart-list"></div>
+    <div class="cart-summary" id="cartSummary" style="display:none;">
+      <div style="text-align:left;margin-bottom:15px;">
+        <label style="font-weight:600;font-size:14px;display:block;margin-bottom:6px;">🎟️ Code promo</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="promoInput" placeholder="Ex: PROMO10" style="flex:1;min-width:150px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;text-transform:uppercase;">
+          <button class="btn-secondary" onclick="appliquerPromo()" style="margin-top:0;padding:10px 18px;">Appliquer</button>
+        </div>
+        <div id="promoMessage" style="margin-top:8px;font-size:14px;"></div>
+      </div>
+
+      <div class="total-line" id="totalOriginal" style="display:none;font-size:1rem;color:#666;margin-bottom:8px;">
+        Sous-total : <span id="cartSousTotal">0 FCFA</span>
+      </div>
+      <div class="total-line" id="remiseLine" style="display:none;font-size:1rem;color:#0a8754;margin-bottom:8px;">
+        🎟️ Remise : <span id="cartRemise">-0 FCFA</span>
+      </div>
+      <div class="total-line"><span>Total :</span> <strong id="cartTotal">0 FCFA</strong></div>
+      <button class="btn-primary" onclick="openCheckout()">Passer la commande</button>
+    </div>
+  </div>
+</section>
+
+<!-- FAVORIS -->
+<section id="page-favoris" class="page">
+  <div class="container">
+    <h2 class="section-title">❤️ Mes Favoris</h2>
+    <div id="favorisList" class="products-grid"></div>
+  </div>
+</section>
+
+<!-- HISTORIQUE -->
+<section id="page-historique" class="page">
+  <div class="container">
+    <h2 class="section-title">🕓 Mon Historique</h2>
+    <div class="admin-section" id="historiqueList"></div>
+  </div>
+</section>
+
+<!-- MES COMMANDES -->
+<section id="page-commandes" class="page">
+  <div class="container">
+    <h2 class="section-title">📦 Mes Commandes</h2>
+    <div class="admin-section" id="mesCommandes"></div>
+  </div>
+</section>
+
+<!-- MESSAGES -->
+<section id="page-messages" class="page">
+  <div class="container">
+    <h2 class="section-title">💬 Mes Messages</h2>
+    <div id="messagesList"></div>
+    <div id="chatView" style="display:none;">
+      <div class="chat-container">
+        <div id="chatHeader" style="padding:10px;font-weight:600;border-bottom:1px solid #eee;"></div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Écrire un message...">
+          <button class="btn-primary" onclick="sendMessage()">Envoyer</button>
+          <button class="btn-secondary" onclick="showContactEmail()">📧</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE COMPTE SUSPENDU (déplacée AVANT modales et footer) ============ -->
+<section id="page-suspendu" class="page">
+  <div class="container">
+    <div class="suspendu-wrapper">
+      <div class="suspendu-icon">🚫</div>
+      <h1 class="suspendu-title">Votre compte est suspendu</h1>
+      <p class="suspendu-intro">
+        Nous sommes désolés de vous informer que votre compte NigerShop a été temporairement suspendu.
+        Cette mesure a été prise dans le cadre de nos règles de bonne conduite.
+      </p>
+
+      <div class="suspendu-info-box">
+        <div class="suspendu-info-line">
+          <span class="suspendu-label">📋 Motif :</span>
+          <span id="pageSuspenduMotif" class="suspendu-value">—</span>
+        </div>
+        <div class="suspendu-info-line" id="pageSuspenduDateLine" style="display:none;">
+          <span class="suspendu-label">📅 Date :</span>
+          <span id="pageSuspenduDate" class="suspendu-value">—</span>
+        </div>
+        <div class="suspendu-info-line" id="pageSuspenduDureeLine" style="display:none;">
+          <span class="suspendu-label">⏱️ Durée :</span>
+          <span id="pageSuspenduDuree" class="suspendu-value">—</span>
+        </div>
+      </div>
+
+      <h2 class="suspendu-h2">📌 Que faire maintenant ?</h2>
+      <p class="suspendu-text">
+        Si vous pensez qu'il s'agit d'une <strong>erreur</strong>, ou si vous souhaitez
+        <strong>contester</strong> cette décision, contactez-nous directement :
+      </p>
+
+      <div class="suspendu-actions">
+        <a id="pageSuspenduCall" class="suspendu-btn suspendu-call" href="tel:+22788893490">
+          <span class="suspendu-btn-icon">📞</span>
+          <span class="suspendu-btn-content">
+            <strong>Appeler</strong>
+            <small id="pageSuspenduCallNum">+227 88 89 34 90</small>
+          </span>
+        </a>
+
+        <a id="pageSuspenduEmail" class="suspendu-btn suspendu-email" href="mailto:nigershop.ne@gmail.com">
+          <span class="suspendu-btn-icon">📧</span>
+          <span class="suspendu-btn-content">
+            <strong>Envoyer un email</strong>
+            <small id="pageSuspenduEmailAddr">nigershop.ne@gmail.com</small>
+          </span>
+        </a>
+
+        <a id="pageSuspenduWhatsApp" class="suspendu-btn suspendu-whatsapp" href="https://wa.me/22788893490" target="_blank">
+          <span class="suspendu-btn-icon">💬</span>
+          <span class="suspendu-btn-content">
+            <strong>WhatsApp</strong>
+            <small>Discussion immédiate</small>
+          </span>
+        </a>
+      </div>
+
+      <div class="suspendu-delay-box">
+        ⏱️ <strong>Délai de traitement :</strong> nous répondons à toutes les réclamations
+        sous <strong>48 heures</strong>.
+      </div>
+
+      <h2 class="suspendu-h2">📖 Vos droits</h2>
+      <ul class="suspendu-droits">
+        <li>✅ Vous pouvez <strong>contester</strong> cette décision à tout moment</li>
+        <li>✅ Vous recevrez une <strong>réponse écrite</strong> par email</li>
+        <li>✅ Vos <strong>données personnelles</strong> restent conservées et sécurisées</li>
+        <li>✅ Vos <strong>commandes en cours</strong> seront livrées normalement</li>
+        <li>✅ Vous pouvez <strong>créer un nouveau compte</strong> avec un autre email (si autorisé)</li>
+      </ul>
+
+      <div class="suspendu-footer">
+        <button class="btn-primary" onclick="showPage('home')">
+          🏠 Retour à l'accueil
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODAL AUTH -->
+<div id="authModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeAuth()">×</span>
+    <h2 id="authTitle">Connexion</h2>
+    <div id="authForm">
+      <input type="text" id="authNom" placeholder="Nom complet" style="display:none;">
+      <input type="text" id="authTel" placeholder="Téléphone" style="display:none;">
+      <input type="text" id="authVille" placeholder="Ville" style="display:none;">
+      <input type="text" id="authCodeParrain" placeholder="Code parrain (optionnel)" style="display:none;">
+      <input type="email" id="authEmail" placeholder="Email">
+      <input type="password" id="authPass" placeholder="Mot de passe">
+      <select id="authRole" style="display:none;">
+        <option value="client">Je suis client</option>
+        <option value="vendeur">Je suis vendeur</option>
+      </select>
+      <button class="btn-primary" id="authSubmit" onclick="submitAuth()" style="width:100%;">Se connecter</button>
+      <p class="auth-switch">
+        <span id="authSwitchText">Pas de compte ?</span>
+        <a onclick="toggleAuthMode(event)">S'inscrire</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CHECKOUT -->
+<div id="checkoutModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeCheckout()">×</span>
+    <h2>Finaliser la commande</h2>
+    <div class="form-group"><label>Ville</label>
+      <select id="checkVille"><option>Niamey</option><option>Maradi</option>
+        <option>Zinder</option><option>Tahoua</option><option>Agadez</option>
+        <option>Dosso</option><option>Tillabéri</option><option>Diffa</option>
+      </select></div>
+    <div class="form-group"><label>Téléphone</label>
+      <input type="tel" id="checkTel" placeholder="+227 ..."></div>
+    <div class="form-group"><label>Transport</label>
+      <select id="checkTransport"><option>STM</option><option>RIMBO</option>
+        <option>AMANA</option><option>SONITRAV</option><option>SONEF</option>
+        <option>NIZAR</option></select>
+      <small id="transportSuggestion" class="hint"></small></div>
+    <div class="form-group"><label>Paiement</label>
+      <select id="checkPaiement"><option>Nita Transfert</option>
+        <option>Amana Transfert</option>
+        <option>Paiement à la livraison</option></select></div>
+    <button class="btn-primary" onclick="submitCommande()" style="width:100%;">Confirmer</button>
+  </div>
+</div>
+
+<!-- MODAL CONTACT EMAIL -->
+<div id="contactEmailModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeContactEmail()">×</span>
+    <h2>📧 Envoyer un email</h2>
+    <input id="emailSujet" placeholder="Sujet">
+    <textarea id="emailMessage" placeholder="Votre message..." style="min-height:120px;"></textarea>
+    <button class="btn-primary" onclick="submitContactEmail()" style="width:100%;">Envoyer</button>
+  </div>
+</div>
+
+<!-- MODALE COMPTE SUSPENDU -->
+<div id="bannedModal" class="modal banned-modal">
+  <div class="modal-content banned-content">
+    <div class="banned-icon">🚫</div>
+    <h2 class="banned-title">Votre compte a été suspendu</h2>
+    <p class="banned-subtitle">
+      Nous sommes désolés de vous informer que votre compte a été temporairement suspendu.
+    </p>
+
+    <div class="banned-info">
+      <div class="banned-info-line">
+        <strong>📋 Motif :</strong>
+        <span id="bannedMotif">—</span>
+      </div>
+      <div class="banned-info-line" id="bannedDateLine" style="display:none;">
+        <strong>📅 Date :</strong>
+        <span id="bannedDate">—</span>
+      </div>
+    </div>
+
+    <p class="banned-help">
+      Pour contester cette décision ou obtenir plus d'informations, contactez-nous directement :
+    </p>
+
+    <div class="banned-actions">
+      <a id="bannedCall" class="banned-btn banned-call" href="tel:+22788893490">
+        <span class="banned-btn-icon">📞</span>
+        <span class="banned-btn-text">
+          <strong>Appeler</strong>
+          <small id="bannedCallNumber">+227 88 89 34 90</small>
+        </span>
+      </a>
+
+      <a id="bannedEmail" class="banned-btn banned-email" href="mailto:nigershop.ne@gmail.com" target="_blank">
+        <span class="banned-btn-icon">📧</span>
+        <span class="banned-btn-text">
+          <strong>Email</strong>
+          <small id="bannedEmailAddr">nigershop.ne@gmail.com</small>
+        </span>
+      </a>
+
+      <a id="bannedWhatsApp" class="banned-btn banned-whatsapp" href="https://wa.me/22788893490" target="_blank">
+        <span class="banned-btn-icon">💬</span>
+        <span class="banned-btn-text">
+          <strong>WhatsApp</strong>
+          <small>Discussion immédiate</small>
+        </span>
+      </a>
+    </div>
+
+    <p class="banned-delay">
+      ⏱️ Nous traitons les réclamations dans les <strong>48 heures</strong>.
+    </p>
+
+    <button class="banned-close-btn" onclick="fermerModaleBannie()">
+      Fermer
+    </button>
+  </div>
+</div>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <div class="footer-logo">
+          <span style="font-size:32px;">🛍️</span>
+          <span>Niger<strong>Shop</strong></span>
+        </div>
+        <p class="footer-desc">
+          La marketplace nigérienne qui connecte acheteurs et vendeurs partout au Niger.
+          Produits vérifiés, livraison rapide, paiement mobile sécurisé.
+        </p>
+        <div class="footer-social">
+          <a href="https://wa.me/22788893490" target="_blank" title="WhatsApp">💬</a>
+          <a href="tel:+22788893490" title="Téléphone">📞</a>
+          <a href="mailto:nigershop.ne@gmail.com" title="Email">📧</a>
+          <a href="#" onclick="showPage('partenariat');return false;" title="Devenir partenaire">🤝</a>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a onclick="showPage('home')">🏠 Accueil</a></li>
+          <li><a onclick="showPage('catalogue')">🛍️ Catalogue</a></li>
+          <li><a onclick="showPage('partenariat')">🤝 Partenariat</a></li>
+          <li><a onclick="showPage('transport')">🚚 Livraison</a></li>
+          <li><a onclick="showPage('panier')">🛒 Mon panier</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Mon compte</h4>
+        <ul>
+          <li><a onclick="openAuth()">👤 Connexion</a></li>
+          <li><a onclick="openAuth()">✨ Créer un compte</a></li>
+          <li><a onclick="showPage('favoris')">❤️ Mes favoris</a></li>
+          <li><a onclick="showPage('historique')">🕓 Mon historique</a></li>
+          <li><a onclick="showPage('commandes')">📦 Mes commandes</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <div class="footer-contact-line">
+          <span>📞</span>
+          <span>+227 88 89 34 90</span>
+        </div>
+        <div class="footer-contact-line">
+          <span>📧</span>
+          <span>nigershop.ne@gmail.com</span>
+        </div>
+        <div class="footer-contact-line">
+          <span>📍</span>
+          <span>Niamey, Niger</span>
+        </div>
+        <div class="footer-contact-line">
+          <span>💳</span>
+          <span>Nita · Amana · Cash à la livraison</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      © <span id="year"></span> <strong>NigerShop</strong> — Tous droits réservés ·
+      Fait avec ❤️ au Niger 🇳🇪
+    </div>
+  </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+
+<a href="https://wa.me/22788893490?text=Bonjour%20NigerShop" class="float-btn whatsapp" target="_blank">💬</a>
+<a href="tel:+22788893490" class="float-btn call">📞</a>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('✅ PWA enregistrée'))
+      .catch(err => console.log('❌ PWA erreur :', err));
+  });
+}
+</script>
+</body>
+</html>

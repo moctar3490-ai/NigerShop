@@ -22,17 +22,17 @@
       <span>Niger<strong>Shop</strong></span>
     </div>
 
-    <!-- Menu desktop -->
     <nav class="nav">
       <a onclick="showPage('home')">Accueil</a>
       <a onclick="showPage('catalogue')">Catalogue</a>
       <a onclick="showPage('partenariat')">Partenariat</a>
       <a onclick="showPage('transport')">Livraison</a>
+      <a onclick="showPage('contact')">Contact</a>
+      <a onclick="showPage('legal')">Légal</a>
       <a onclick="showPage('messages')" id="navMessages" style="display:none;">Messages</a>
       <a onclick="showPage('commandes')" id="navCommandes" style="display:none;">Mes commandes</a>
     </nav>
 
-    <!-- Bouton burger (mobile) -->
     <button class="burger" onclick="toggleMobileMenu()">☰</button>
 
     <div class="header-actions">
@@ -41,7 +41,21 @@
       <button class="icon-btn" onclick="showPage('favoris')" title="Favoris">❤️</button>
       <button class="icon-btn" onclick="showPage('historique')" title="Historique">🕓</button>
       <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Mode sombre / clair">🌙</button>
-      <button class="icon-btn" id="authBtn" onclick="openAuth()">👤 Connexion</button>
+      <div class="user-menu-container" id="userMenuContainer">
+        <button class="icon-btn" id="authBtn" onclick="handleAuthBtn()">👤 Connexion</button>
+        <div class="user-dropdown" id="userDropdown" style="display:none;">
+          <div class="user-dropdown-header" id="userDropdownHeader"></div>
+          <a onclick="closeUserMenu();showPage('commandes')">📦 Mes commandes</a>
+          <a onclick="closeUserMenu();showPage('favoris')">❤️ Mes favoris</a>
+          <a onclick="closeUserMenu();showPage('historique')">🕓 Mon historique</a>
+          <a onclick="closeUserMenu();showPage('messages')">💬 Mes messages</a>
+          <a onclick="closeUserMenu();showPage('partenariat')">🤝 Parrainage</a>
+          <a onclick="closeUserMenu();openPasswordModal()">🔐 Changer mon mot de passe</a>
+          <div class="user-dropdown-divider"></div>
+          <a id="adminLink" onclick="closeUserMenu();window.location.href='/admin.html'" style="display:none;color:#ff6b00;font-weight:700;">⚙️ Tableau de bord admin</a>
+          <a onclick="closeUserMenu();logout()" style="color:#d32f2f;">🚪 Déconnexion</a>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -54,6 +68,8 @@
     <a onclick="closeMobileMenu();showPage('catalogue')">🛍️ Catalogue</a>
     <a onclick="closeMobileMenu();showPage('partenariat')">🤝 Partenariat</a>
     <a onclick="closeMobileMenu();showPage('transport')">🚚 Livraison</a>
+    <a onclick="closeMobileMenu();showPage('contact')">📞 Contact</a>
+    <a onclick="closeMobileMenu();showPage('legal')">📜 Informations légales</a>
     <a onclick="closeMobileMenu();showPage('panier')">🛒 Panier</a>
     <a onclick="closeMobileMenu();showPage('favoris')">❤️ Favoris</a>
     <a onclick="closeMobileMenu();showPage('historique')">🕓 Historique</a>
@@ -106,9 +122,30 @@
       <button class="btn-primary" onclick="applyFilters()">Appliquer</button>
       <button class="btn-secondary" onclick="resetFilters()">Réinitialiser</button>
     </aside>
-    <main>
+        <main>
       <h2 class="section-title">Catalogue complet</h2>
+
+      <!-- Info du nombre de produits -->
+      <div id="catalogueInfo" class="catalogue-info" style="display:none;"></div>
+
+      <!-- Grille de produits -->
       <div id="catalogueProducts" class="products-grid"></div>
+
+      <!-- Pagination -->
+      <div id="paginationContainer" class="pagination-container" style="display:none;">
+        <div class="pagination-top">
+          <span id="paginationInfo"></span>
+        </div>
+        <div class="pagination-controls">
+          <button class="pagination-btn" id="paginationPrev" onclick="goToPage(currentPage - 1)">
+            ← Précédent
+          </button>
+          <div class="pagination-numbers" id="paginationNumbers"></div>
+          <button class="pagination-btn" id="paginationNext" onclick="goToPage(currentPage + 1)">
+            Suivant →
+          </button>
+        </div>
+      </div>
     </main>
   </div>
 </section>
@@ -183,24 +220,24 @@
     <h2 class="section-title">🛒 Mon Panier</h2>
     <div id="cartItems" class="cart-list"></div>
     <div class="cart-summary" id="cartSummary" style="display:none;">
-  <div style="text-align:left;margin-bottom:15px;">
-    <label style="font-weight:600;font-size:14px;display:block;margin-bottom:6px;">🎟️ Code promo</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <input type="text" id="promoInput" placeholder="Ex: PROMO10" style="flex:1;min-width:150px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;text-transform:uppercase;">
-      <button class="btn-secondary" onclick="appliquerPromo()" style="margin-top:0;padding:10px 18px;">Appliquer</button>
-    </div>
-    <div id="promoMessage" style="margin-top:8px;font-size:14px;"></div>
-  </div>
+      <div style="text-align:left;margin-bottom:15px;">
+        <label style="font-weight:600;font-size:14px;display:block;margin-bottom:6px;">🎟️ Code promo</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="promoInput" placeholder="Ex: PROMO10" style="flex:1;min-width:150px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;text-transform:uppercase;">
+          <button class="btn-secondary" onclick="appliquerPromo()" style="margin-top:0;padding:10px 18px;">Appliquer</button>
+        </div>
+        <div id="promoMessage" style="margin-top:8px;font-size:14px;"></div>
+      </div>
 
-  <div class="total-line" id="totalOriginal" style="display:none;font-size:1rem;color:#666;margin-bottom:8px;">
-    Sous-total : <span id="cartSousTotal">0 FCFA</span>
-  </div>
-  <div class="total-line" id="remiseLine" style="display:none;font-size:1rem;color:#0a8754;margin-bottom:8px;">
-    🎟️ Remise : <span id="cartRemise">-0 FCFA</span>
-  </div>
-  <div class="total-line"><span>Total :</span> <strong id="cartTotal">0 FCFA</strong></div>
-  <button class="btn-primary" onclick="openCheckout()">Passer la commande</button>
-</div>
+      <div class="total-line" id="totalOriginal" style="display:none;font-size:1rem;color:#666;margin-bottom:8px;">
+        Sous-total : <span id="cartSousTotal">0 FCFA</span>
+      </div>
+      <div class="total-line" id="remiseLine" style="display:none;font-size:1rem;color:#0a8754;margin-bottom:8px;">
+        🎟️ Remise : <span id="cartRemise">-0 FCFA</span>
+      </div>
+      <div class="total-line"><span>Total :</span> <strong id="cartTotal">0 FCFA</strong></div>
+      <button class="btn-primary" onclick="openCheckout()">Passer la commande</button>
+    </div>
   </div>
 </section>
 
@@ -247,30 +284,677 @@
   </div>
 </section>
 
+<!-- ============ PAGE RÉINITIALISATION MOT DE PASSE ============ -->
+<section id="page-reset-password" class="page">
+  <div class="container">
+    <div class="reset-wrapper">
+      <div class="reset-icon">🔐</div>
+      <h1 class="reset-title">Nouveau mot de passe</h1>
+      <p class="reset-subtitle" id="resetSubtitle">
+        Choisissez un nouveau mot de passe sécurisé pour votre compte.
+      </p>
+
+      <div id="resetLoading" style="text-align:center;padding:20px;">
+        <p>⏳ Vérification du lien...</p>
+      </div>
+
+      <div id="resetForm" style="display:none;">
+        <div class="form-group">
+          <label>Nouveau mot de passe *</label>
+          <div class="password-wrapper">
+  <input type="password" id="resetNewPass" placeholder="Minimum 6 caractères">
+  <button type="button" class="password-toggle" onclick="togglePassword('resetNewPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+          <small class="hint">Minimum 6 caractères.</small>
+        </div>
+
+        <div class="form-group">
+          <label>Confirmer le nouveau mot de passe *</label>
+          <div class="password-wrapper">
+  <input type="password" id="resetConfirmPass" placeholder="Retaper le mot de passe">
+  <button type="button" class="password-toggle" onclick="togglePassword('resetConfirmPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+        </div>
+
+        <div id="resetMessage" style="margin:12px 0;font-size:14px;"></div>
+
+        <button class="btn-primary" onclick="submitResetPassword()" style="width:100%;">
+          ✅ Valider le nouveau mot de passe
+        </button>
+      </div>
+
+      <div id="resetError" style="display:none;text-align:center;padding:20px;">
+        <div style="font-size:60px;margin-bottom:15px;">⚠️</div>
+        <h3 style="color:#d32f2f;margin-bottom:15px;">Lien invalide ou expiré</h3>
+        <p style="color:#666;margin-bottom:20px;" id="resetErrorMsg">
+          Ce lien de réinitialisation n'est plus valide.
+        </p>
+        <button class="btn-primary" onclick="openForgotPasswordModal();showPage('home')">
+          📧 Demander un nouveau lien
+        </button>
+      </div>
+
+      <div id="resetSuccess" style="display:none;text-align:center;padding:20px;">
+        <div style="font-size:60px;margin-bottom:15px;">✅</div>
+        <h3 style="color:#0a8754;margin-bottom:15px;">Mot de passe modifié !</h3>
+        <p style="color:#666;margin-bottom:20px;">
+          Votre nouveau mot de passe est actif. Vous pouvez maintenant vous connecter.
+        </p>
+        <button class="btn-primary" onclick="showPage('home');openAuth()">
+          🔑 Se connecter
+        </button>
+      </div>
+
+      <div class="reset-footer">
+        <button class="btn-secondary" onclick="showPage('home')">
+          🏠 Retour à l'accueil
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============ PAGE MENTIONS LÉGALES + CGV ============ -->
+<section id="page-legal" class="page">
+  <div class="container">
+    <div class="legal-header">
+      <h1 class="legal-title">📜 Informations légales</h1>
+      <p class="legal-subtitle">
+        Dernière mise à jour : <span id="legalDate"></span>
+      </p>
+    </div>
+
+    <!-- Onglets -->
+    <div class="legal-tabs">
+      <button class="legal-tab active" onclick="switchLegalTab(event, 'mentions')">📋 Mentions légales</button>
+      <button class="legal-tab" onclick="switchLegalTab(event, 'cgv')">📝 CGV</button>
+      <button class="legal-tab" onclick="switchLegalTab(event, 'confidentialite')">🔒 Confidentialité</button>
+    </div>
+
+    <!-- Onglet : Mentions légales -->
+    <div class="legal-content active" id="legal-mentions">
+      <h2>1. Éditeur du site</h2>
+      <p>
+        Le site <strong>NigerShop</strong> est édité par :
+      </p>
+      <ul>
+        <li><strong>Raison sociale :</strong> NigerShop</li>
+        <li><strong>Forme juridique :</strong> [À COMPLÉTER — ex : Entreprise individuelle]</li>
+        <li><strong>Siège social :</strong> Niamey, Niger</li>
+        <li><strong>Numéro RCCM :</strong> [À COMPLÉTER — ex : NI/XXX/XXXX]</li>
+        <li><strong>Numéro NIF :</strong> [À COMPLÉTER]</li>
+        <li><strong>Email :</strong> <a href="mailto:nigershop.ne@gmail.com">nigershop.ne@gmail.com</a></li>
+        <li><strong>Téléphone :</strong> <a href="tel:+22788893490">+227 88 89 34 90</a></li>
+        <li><strong>WhatsApp :</strong> <a href="https://wa.me/22788893490" target="_blank">Discuter maintenant</a></li>
+      </ul>
+
+      <h2>2. Hébergement</h2>
+      <p>Le site est hébergé par :</p>
+      <ul>
+        <li><strong>Render Services, Inc.</strong></li>
+        <li>525 Brannan Street, San Francisco, CA 94107, USA</li>
+        <li><a href="https://render.com" target="_blank">render.com</a></li>
+      </ul>
+
+      <h2>3. Propriété intellectuelle</h2>
+      <p>
+        L'ensemble des contenus présents sur NigerShop (textes, images, logos, vidéos, structure)
+        sont la propriété exclusive de NigerShop ou de ses partenaires et sont protégés par les
+        lois relatives à la propriété intellectuelle.
+      </p>
+      <p>
+        Toute reproduction, représentation, modification ou exploitation, totale ou partielle,
+        sans autorisation écrite préalable, est strictement interdite.
+      </p>
+
+      <h2>4. Responsabilité</h2>
+      <p>
+        NigerShop s'efforce d'assurer l'exactitude des informations diffusées sur son site.
+        Toutefois, NigerShop ne peut garantir l'exactitude, la précision ou l'exhaustivité
+        des informations mises à disposition.
+      </p>
+      <p>
+        NigerShop agit en tant qu'intermédiaire entre les vendeurs partenaires et les clients.
+        À ce titre, NigerShop ne saurait être tenu responsable des manquements contractuels
+        des vendeurs.
+      </p>
+
+      <h2>5. Liens hypertextes</h2>
+      <p>
+        Le site NigerShop peut contenir des liens vers d'autres sites. NigerShop n'exerce
+        aucun contrôle sur ces sites et décline toute responsabilité quant à leur contenu.
+      </p>
+
+      <h2>6. Droit applicable</h2>
+      <p>
+        Les présentes mentions légales sont régies par le droit nigérien. Tout litige relatif
+        à l'utilisation du site NigerShop sera soumis à la compétence exclusive des tribunaux
+        de Niamey, Niger.
+      </p>
+    </div>
+
+    <!-- Onglet : CGV -->
+    <div class="legal-content" id="legal-cgv">
+      <h2>Article 1 — Objet</h2>
+      <p>
+        Les présentes Conditions Générales de Vente (CGV) régissent l'utilisation du site
+        NigerShop et les transactions entre NigerShop, ses vendeurs partenaires et ses clients.
+      </p>
+      <p>
+        Toute commande passée sur NigerShop implique l'acceptation sans réserve des présentes CGV.
+      </p>
+
+      <h2>Article 2 — Produits</h2>
+      <p>
+        Les produits proposés sur NigerShop sont décrits et présentés avec la plus grande
+        exactitude possible. Les photographies sont indicatives et peuvent présenter de légères
+        différences avec le produit réel.
+      </p>
+      <p>
+        La disponibilité des produits est mise à jour régulièrement mais peut varier. En cas
+        d'indisponibilité après commande, le client sera informé et remboursé.
+      </p>
+
+      <h2>Article 3 — Prix</h2>
+      <p>
+        Les prix sont indiqués en francs CFA (FCFA), toutes taxes comprises. NigerShop se réserve
+        le droit de modifier ses prix à tout moment, étant entendu que le prix appliqué est celui
+        affiché au moment de la validation de la commande.
+      </p>
+
+      <h2>Article 4 — Commande</h2>
+      <p>Pour passer commande sur NigerShop :</p>
+      <ol>
+        <li>Créer un compte client (ou se connecter)</li>
+        <li>Ajouter les produits au panier</li>
+        <li>Valider le panier</li>
+        <li>Remplir les informations de livraison</li>
+        <li>Choisir le mode de paiement</li>
+        <li>Confirmer la commande</li>
+      </ol>
+      <p>
+        Le client reçoit une confirmation par email récapitulant sa commande. La commande est
+        considérée comme définitive après cette confirmation.
+      </p>
+
+      <h2>Article 5 — Paiement</h2>
+      <p>NigerShop accepte les modes de paiement suivants :</p>
+      <ul>
+        <li><strong>Nita Transfert</strong> — Paiement mobile instantané</li>
+        <li><strong>Amana Transfert</strong> — Transfert sécurisé</li>
+        <li><strong>Paiement à la livraison</strong> — En espèces (selon la ville)</li>
+      </ul>
+      <p>
+        Le paiement doit être effectué dans les délais indiqués. Toute commande non payée dans
+        les 48 heures pourra être annulée.
+      </p>
+
+      <h2>Article 6 — Livraison</h2>
+      <p>
+        NigerShop livre partout au Niger via ses partenaires transporteurs : STM, RIMBO, AMANA,
+        SONITRAV, SONEF et NIZAR.
+      </p>
+      <p><strong>Délais indicatifs :</strong></p>
+      <ul>
+        <li>Niamey : 1 à 2 jours ouvrables</li>
+        <li>Autres régions : 3 à 5 jours ouvrables</li>
+        <li>Zones éloignées (Agadez, Diffa) : 5 à 7 jours ouvrables</li>
+      </ul>
+      <p>
+        Les frais de livraison sont calculés en fonction de la ville de destination et du
+        transporteur choisi.
+      </p>
+
+      <h2>Article 7 — Droit de rétractation et retours</h2>
+      <p>
+        Le client dispose de <strong>7 jours</strong> à compter de la réception pour retourner
+        un produit non conforme ou non désiré, à condition qu'il soit :
+      </p>
+      <ul>
+        <li>Non utilisé</li>
+        <li>Dans son emballage d'origine complet</li>
+        <li>Accompagné de la facture</li>
+      </ul>
+      <p>
+        Les frais de retour sont à la charge du client, sauf en cas d'erreur de NigerShop ou
+        de produit défectueux.
+      </p>
+
+      <h2>Article 8 — Garantie</h2>
+      <p>
+        Les produits bénéficient de la garantie constructeur ou fournisseur. En cas de défaut
+        constaté, le client doit contacter NigerShop dans les plus brefs délais avec preuve
+        d'achat et description du problème.
+      </p>
+
+      <h2>Article 9 — Responsabilité</h2>
+      <p>
+        NigerShop agit en qualité d'intermédiaire. Sa responsabilité ne saurait être engagée
+        en cas de manquement contractuel d'un vendeur partenaire, mais NigerShop s'engage à
+        faciliter la résolution amiable de tout litige.
+      </p>
+
+      <h2>Article 10 — Données personnelles</h2>
+      <p>
+        Les données collectées sont traitées conformément à notre
+        <a onclick="switchLegalTab(null, 'confidentialite', true)">Politique de Confidentialité</a>.
+      </p>
+
+      <h2>Article 11 — Modification des CGV</h2>
+      <p>
+        NigerShop se réserve le droit de modifier les présentes CGV à tout moment. Les CGV
+        applicables sont celles en vigueur au moment de la commande.
+      </p>
+
+      <h2>Article 12 — Litiges</h2>
+      <p>
+        En cas de litige, une solution amiable sera recherchée en priorité. À défaut d'accord,
+        le litige sera soumis aux tribunaux compétents de Niamey, Niger.
+      </p>
+
+      <h2>Article 13 — Contact</h2>
+      <p>
+        Pour toute question : <a href="mailto:nigershop.ne@gmail.com">nigershop.ne@gmail.com</a>
+        — <a href="tel:+22788893490">+227 88 89 34 90</a>
+      </p>
+    </div>
+
+    <!-- Onglet : Confidentialité -->
+    <div class="legal-content" id="legal-confidentialite">
+      <h2>1. Notre engagement</h2>
+      <p>
+        NigerShop s'engage à protéger la vie privée de ses utilisateurs. Cette politique
+        explique quelles données nous collectons, comment nous les utilisons et quels sont
+        vos droits.
+      </p>
+
+      <h2>2. Données collectées</h2>
+      <p>Nous collectons les données suivantes :</p>
+      <ul>
+        <li><strong>À l'inscription :</strong> nom, email, téléphone, ville</li>
+        <li><strong>Lors des commandes :</strong> adresse de livraison, historique d'achat</li>
+        <li><strong>Navigation :</strong> pages visitées, produits consultés, favoris</li>
+        <li><strong>Techniques :</strong> adresse IP, type de navigateur, système d'exploitation</li>
+      </ul>
+
+      <h2>3. Utilisation des données</h2>
+      <p>Vos données sont utilisées pour :</p>
+      <ul>
+        <li>Gérer votre compte et vos commandes</li>
+        <li>Vous envoyer les confirmations et notifications</li>
+        <li>Améliorer nos services et votre expérience</li>
+        <li>Vous proposer des produits pertinents</li>
+        <li>Respecter nos obligations légales et comptables</li>
+      </ul>
+
+      <h2>4. Partage des données</h2>
+      <p>Vos données peuvent être partagées uniquement avec :</p>
+      <ul>
+        <li><strong>Nos transporteurs partenaires</strong> (nom, adresse, téléphone) pour la livraison</li>
+        <li><strong>Nos vendeurs partenaires</strong> (nom, téléphone) pour traiter les commandes</li>
+        <li><strong>Les autorités</strong> si la loi l'exige</li>
+      </ul>
+      <p>
+        <strong>Nous ne vendons jamais vos données à des tiers.</strong>
+      </p>
+
+      <h2>5. Sécurité</h2>
+      <p>
+        Nous mettons en œuvre des mesures techniques et organisationnelles pour protéger vos
+        données : chiffrement des mots de passe, connexions sécurisées (HTTPS), accès restreint
+        aux données sensibles.
+      </p>
+
+      <h2>6. Conservation</h2>
+      <p>
+        Vos données sont conservées :
+      </p>
+      <ul>
+        <li><strong>Compte actif :</strong> tant que vous utilisez le service</li>
+        <li><strong>Après suppression du compte :</strong> 3 ans pour obligations légales et comptables</li>
+        <li><strong>Données de navigation :</strong> 13 mois maximum</li>
+      </ul>
+
+      <h2>7. Vos droits</h2>
+      <p>Vous avez le droit de :</p>
+      <ul>
+        <li><strong>Accéder</strong> à vos données personnelles</li>
+        <li><strong>Corriger</strong> les informations inexactes</li>
+        <li><strong>Supprimer</strong> votre compte et vos données</li>
+        <li><strong>Vous opposer</strong> au traitement de vos données</li>
+        <li><strong>Retirer votre consentement</strong> à tout moment</li>
+      </ul>
+      <p>
+        Pour exercer ces droits, contactez-nous à :
+        <a href="mailto:nigershop.ne@gmail.com">nigershop.ne@gmail.com</a>
+      </p>
+
+      <h2>8. Cookies</h2>
+      <p>
+        NigerShop utilise des cookies strictement nécessaires au fonctionnement du site
+        (session, panier, préférences). Nous n'utilisons pas de cookies publicitaires.
+      </p>
+
+      <h2>9. Modifications</h2>
+      <p>
+        Cette politique de confidentialité peut être modifiée à tout moment. La version
+        applicable est celle en vigueur lors de votre utilisation du site.
+      </p>
+
+      <h2>10. Contact</h2>
+      <p>
+        Pour toute question sur vos données personnelles :
+      </p>
+      <ul>
+        <li><strong>Email :</strong> <a href="mailto:nigershop.ne@gmail.com">nigershop.ne@gmail.com</a></li>
+        <li><strong>Téléphone :</strong> <a href="tel:+22788893490">+227 88 89 34 90</a></li>
+      </ul>
+    </div>
+
+    <!-- Bouton retour -->
+    <div class="legal-footer">
+      <button class="btn-primary" onclick="showPage('home')">
+        🏠 Retour à l'accueil
+      </button>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============ PAGE CONTACT ============ -->
+<section id="page-contact" class="page">
+  <div class="container">
+    <div class="contact-header">
+      <h1 class="contact-title">📞 Contactez-nous</h1>
+      <p class="contact-subtitle">
+        Une question ? Un problème ? Une suggestion ? Nous sommes là pour vous aider !
+      </p>
+    </div>
+
+    <div class="contact-layout">
+      <!-- Formulaire -->
+      <div class="contact-form-box">
+        <h2>📝 Envoyez-nous un message</h2>
+        <p class="contact-form-help">
+          Remplissez le formulaire ci-dessous et nous vous répondrons dans les plus brefs délais.
+        </p>
+
+        <form id="contactForm" onsubmit="submitContactForm(event)">
+          <div class="form-group">
+            <label>Votre nom *</label>
+            <input type="text" id="contactNom" placeholder="Ex: Moctar Mamane" required>
+          </div>
+
+          <div class="form-group">
+            <label>Votre email *</label>
+            <input type="email" id="contactEmail" placeholder="Ex: email@exemple.com" required>
+          </div>
+
+          <div class="form-group">
+            <label>Votre téléphone (optionnel)</label>
+            <input type="tel" id="contactTel" placeholder="Ex: +227 88 89 34 90">
+          </div>
+
+          <div class="form-group">
+            <label>Sujet *</label>
+            <select id="contactSujet" required>
+              <option value="">-- Choisissez un sujet --</option>
+              <option value="Question sur une commande">📦 Question sur une commande</option>
+              <option value="Problème avec un produit">⚠️ Problème avec un produit</option>
+              <option value="Devenir vendeur/partenaire">🤝 Devenir vendeur/partenaire</option>
+              <option value="Réclamation">😞 Réclamation</option>
+              <option value="Suggestion">💡 Suggestion</option>
+              <option value="Autre">💬 Autre</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Votre message *</label>
+            <textarea id="contactMessage" placeholder="Décrivez votre demande en détail..." required style="min-height:140px;"></textarea>
+          </div>
+
+          <button type="submit" class="btn-primary contact-submit">
+            📤 Envoyer le message
+          </button>
+
+          <p class="contact-form-note">
+            ✅ Réponse garantie sous <strong>48 heures</strong> ouvrées
+          </p>
+        </form>
+      </div>
+
+      <!-- Coordonnées -->
+      <div class="contact-info-box">
+        <h2>📞 Coordonnées directes</h2>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon">📞</div>
+          <div class="contact-info-content">
+            <strong>Téléphone</strong>
+            <a href="tel:+22788893490">+227 88 89 34 90</a>
+            <small>Lun-Ven · 8h à 18h</small>
+          </div>
+        </div>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon">📧</div>
+          <div class="contact-info-content">
+            <strong>Email</strong>
+            <a href="mailto:nigershop.ne@gmail.com">nigershop.ne@gmail.com</a>
+            <small>Réponse sous 48h</small>
+          </div>
+        </div>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon">💬</div>
+          <div class="contact-info-content">
+            <strong>WhatsApp</strong>
+            <a href="https://wa.me/22788893490" target="_blank">Discuter maintenant</a>
+            <small>Réponse immédiate</small>
+          </div>
+        </div>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon">📍</div>
+          <div class="contact-info-content">
+            <strong>Adresse</strong>
+            <span>Niamey, Niger</span>
+            <small>Sur rendez-vous</small>
+          </div>
+        </div>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon">🕐</div>
+          <div class="contact-info-content">
+            <strong>Horaires</strong>
+            <span>Lun-Ven : 8h - 18h</span>
+            <small>Sam : 9h - 13h</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boutons d'action rapide -->
+    <div class="contact-actions-row">
+      <h3>Ou contactez-nous directement</h3>
+      <div class="contact-action-buttons">
+        <a href="https://wa.me/22788893490?text=Bonjour%20NigerShop" target="_blank" class="contact-quick-btn contact-wa">
+          💬 WhatsApp
+        </a>
+        <a href="tel:+22788893490" class="contact-quick-btn contact-phone">
+          📞 Appeler
+        </a>
+        <a href="mailto:nigershop.ne@gmail.com" class="contact-quick-btn contact-mail">
+          📧 Envoyer un email
+        </a>
+      </div>
+    </div>
+
+    <!-- FAQ rapide -->
+    <div class="contact-faq">
+      <h3>❓ Questions fréquentes</h3>
+
+      <details class="faq-item">
+        <summary>Comment suivre ma commande ?</summary>
+        <p>Connectez-vous à votre compte, puis allez dans <strong>Mes commandes</strong> pour voir le statut en temps réel.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Quels sont les modes de paiement acceptés ?</summary>
+        <p>Nous acceptons <strong>Nita Transfert</strong>, <strong>Amana Transfert</strong> et le <strong>paiement à la livraison</strong> selon la ville.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Quels sont les délais de livraison ?</summary>
+        <p>2 à 5 jours ouvrables selon la ville. Niamey : 1-2 jours · Autres régions : 3-5 jours.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Comment devenir vendeur partenaire ?</summary>
+        <p>Rendez-vous sur la page <a onclick="showPage('partenariat')">Partenariat</a> et choisissez la formule qui vous convient.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Puis-je retourner un produit ?</summary>
+        <p>Oui, sous 7 jours si le produit est non utilisé et dans son emballage d'origine. Contactez-nous d'abord.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============ PAGE COMPTE SUSPENDU (déplacée AVANT modales et footer) ============ -->
+<section id="page-suspendu" class="page">
+  <div class="container">
+    <div class="suspendu-wrapper">
+      <div class="suspendu-icon">🚫</div>
+      <h1 class="suspendu-title">Votre compte est suspendu</h1>
+      <p class="suspendu-intro">
+        Nous sommes désolés de vous informer que votre compte NigerShop a été temporairement suspendu.
+        Cette mesure a été prise dans le cadre de nos règles de bonne conduite.
+      </p>
+
+      <div class="suspendu-info-box">
+        <div class="suspendu-info-line">
+          <span class="suspendu-label">📋 Motif :</span>
+          <span id="pageSuspenduMotif" class="suspendu-value">—</span>
+        </div>
+        <div class="suspendu-info-line" id="pageSuspenduDateLine" style="display:none;">
+          <span class="suspendu-label">📅 Date :</span>
+          <span id="pageSuspenduDate" class="suspendu-value">—</span>
+        </div>
+        <div class="suspendu-info-line" id="pageSuspenduDureeLine" style="display:none;">
+          <span class="suspendu-label">⏱️ Durée :</span>
+          <span id="pageSuspenduDuree" class="suspendu-value">—</span>
+        </div>
+      </div>
+
+      <h2 class="suspendu-h2">📌 Que faire maintenant ?</h2>
+      <p class="suspendu-text">
+        Si vous pensez qu'il s'agit d'une <strong>erreur</strong>, ou si vous souhaitez
+        <strong>contester</strong> cette décision, contactez-nous directement :
+      </p>
+
+      <div class="suspendu-actions">
+        <a id="pageSuspenduCall" class="suspendu-btn suspendu-call" href="tel:+22788893490">
+          <span class="suspendu-btn-icon">📞</span>
+          <span class="suspendu-btn-content">
+            <strong>Appeler</strong>
+            <small id="pageSuspenduCallNum">+227 88 89 34 90</small>
+          </span>
+        </a>
+
+        <a id="pageSuspenduEmail" class="suspendu-btn suspendu-email" href="mailto:moctarmamannigershop@gmail.com">
+          <span class="suspendu-btn-icon">📧</span>
+          <span class="suspendu-btn-content">
+            <strong>Envoyer un email</strong>
+            <small id="pageSuspenduEmailAddr">moctarmamannigershop@gmail.com</small>
+          </span>
+        </a>
+
+        <a id="pageSuspenduWhatsApp" class="suspendu-btn suspendu-whatsapp" href="https://wa.me/22788893490" target="_blank">
+          <span class="suspendu-btn-icon">💬</span>
+          <span class="suspendu-btn-content">
+            <strong>WhatsApp</strong>
+            <small>Discussion immédiate</small>
+          </span>
+        </a>
+      </div>
+
+      <div class="suspendu-delay-box">
+        ⏱️ <strong>Délai de traitement :</strong> nous répondons à toutes les réclamations
+        sous <strong>48 heures</strong>.
+      </div>
+
+      <h2 class="suspendu-h2">📖 Vos droits</h2>
+      <ul class="suspendu-droits">
+        <li>✅ Vous pouvez <strong>contester</strong> cette décision à tout moment</li>
+        <li>✅ Vous recevrez une <strong>réponse écrite</strong> par email</li>
+        <li>✅ Vos <strong>données personnelles</strong> restent conservées et sécurisées</li>
+        <li>✅ Vos <strong>commandes en cours</strong> seront livrées normalement</li>
+        <li>✅ Vous pouvez <strong>créer un nouveau compte</strong> avec un autre email (si autorisé)</li>
+      </ul>
+
+      <div class="suspendu-footer">
+        <button class="btn-primary" onclick="showPage('home')">
+          🏠 Retour à l'accueil
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- MODAL AUTH -->
 <div id="authModal" class="modal">
   <div class="modal-content">
     <span class="close" onclick="closeAuth()">×</span>
     <h2 id="authTitle">Connexion</h2>
     <div id="authForm">
+      <!-- Champs inscription (masqués par défaut) -->
       <input type="text" id="authNom" placeholder="Nom complet" style="display:none;">
       <input type="text" id="authTel" placeholder="Téléphone" style="display:none;">
       <input type="text" id="authVille" placeholder="Ville" style="display:none;">
       <input type="text" id="authCodeParrain" placeholder="Code parrain (optionnel)" style="display:none;">
+
+            <!-- Champs communs -->
       <input type="email" id="authEmail" placeholder="Email">
-      <input type="password" id="authPass" placeholder="Mot de passe">
+      <div class="password-wrapper">
+      <div class="password-wrapper">
+  <input type="password" id="authPass" placeholder="Mot de passe">
+  <button type="button" class="password-toggle" onclick="togglePassword('authPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+  <button type="button" class="password-toggle" onclick="togglePassword('authPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+      <div class="password-wrapper" id="authPassConfirmWrapper" style="display:none;">
+  <input type="password" id="authPassConfirm" placeholder="Confirmer le mot de passe">
+  <button type="button" class="password-toggle" onclick="togglePassword('authPassConfirm', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+      <!-- Rôle (inscription uniquement) -->
       <select id="authRole" style="display:none;">
         <option value="client">Je suis client</option>
         <option value="vendeur">Je suis vendeur</option>
       </select>
-      <button class="btn-primary" id="authSubmit" onclick="submitAuth()" style="width:100%;">Se connecter</button>
+
+      <!-- Lien "Mot de passe oublié ?" (connexion uniquement) -->
+      <div id="forgotPasswordLink" style="text-align:right;margin-top:-5px;margin-bottom:10px;">
+        <a onclick="openForgotPasswordModal()" style="color:#ff6b00;font-size:13px;cursor:pointer;font-weight:600;">
+          🔐 Mot de passe oublié ?
+        </a>
+      </div>
+
+      <!-- Bouton principal -->
+      <button class="btn-primary" id="authSubmit" onclick="submitAuth()" style="width:100%;">🔑 Se connecter</button>
+
+      <!-- Lien bascule -->
       <p class="auth-switch">
         <span id="authSwitchText">Pas de compte ?</span>
-        <a onclick="toggleAuthMode(event)">S'inscrire</a>
+        <a id="authSwitchLink" onclick="toggleAuthMode(event)">S'inscrire</a>
       </p>
     </div>
   </div>
 </div>
+
 
 <!-- MODAL CHECKOUT -->
 <div id="checkoutModal" class="modal">
@@ -297,6 +981,189 @@
   </div>
 </div>
 
+<!-- MODAL MOT DE PASSE OUBLIÉ (3 étapes) -->
+<div id="forgotPasswordModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeForgotPasswordModal()">×</span>
+
+    <!-- ÉTAPE 1 : Email -->
+    <div id="forgotStep1">
+      <h2>🔐 Mot de passe oublié</h2>
+      <p style="color:#666;font-size:14px;margin-bottom:20px;">
+        Saisissez votre email. Nous vous enverrons un <strong>code à 6 chiffres</strong> pour créer un nouveau mot de passe.
+      </p>
+
+      <div class="form-group">
+        <label>Votre adresse email *</label>
+        <input type="email" id="forgotEmail" placeholder="Ex: email@exemple.com">
+      </div>
+
+      <div id="forgotMessage1" style="margin:12px 0;font-size:14px;"></div>
+
+      <button class="btn-primary" id="forgotBtn1" onclick="submitForgotStep1()" style="width:100%;">
+        📧 Recevoir le code
+      </button>
+      <button class="btn-secondary" onclick="closeForgotPasswordModal()" style="width:100%;margin-top:8px;">
+        Annuler
+      </button>
+    </div>
+
+    <!-- ÉTAPE 2 : Code -->
+    <div id="forgotStep2" style="display:none;">
+      <h2>🔐 Vérification</h2>
+      <p style="color:#666;font-size:14px;margin-bottom:20px;">
+        Un code à 6 chiffres a été envoyé à :<br>
+        <strong id="forgotEmailDisplay"></strong>
+      </p>
+
+      <div class="form-group">
+        <label>Code à 6 chiffres *</label>
+        <input type="text"
+               id="forgotCode"
+               placeholder="123456"
+               maxlength="6"
+               inputmode="numeric"
+               pattern="\d{6}"
+               style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;padding:15px;">
+        <small class="hint">⏱️ Valable 10 minutes · 5 tentatives max</small>
+      </div>
+
+      <div id="forgotMessage2" style="margin:12px 0;font-size:14px;"></div>
+
+      <button class="btn-primary" id="forgotBtn2" onclick="submitForgotStep2()" style="width:100%;">
+        ✅ Vérifier le code
+      </button>
+      <button class="btn-secondary" onclick="resendForgotCode()" style="width:100%;margin-top:8px;" id="resendBtn">
+        🔄 Renvoyer le code
+      </button>
+      <button class="btn-secondary" onclick="backToForgotStep1()" style="width:100%;margin-top:8px;">
+        ← Changer d'email
+      </button>
+    </div>
+
+    <!-- ÉTAPE 3 : Nouveau mot de passe -->
+    <div id="forgotStep3" style="display:none;">
+      <h2>🔐 Nouveau mot de passe</h2>
+      <p style="color:#666;font-size:14px;margin-bottom:20px;">
+        Code vérifié ✅ Créez maintenant votre nouveau mot de passe.
+      </p>
+
+      <div class="form-group">
+        <label>Nouveau mot de passe *</label>
+        <div class="password-wrapper">
+  <input type="password" id="forgotNewPass" placeholder="Minimum 6 caractères">
+  <button type="button" class="password-toggle" onclick="togglePassword('forgotNewPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+        <small class="hint">Minimum 6 caractères.</small>
+      </div>
+
+      <div class="form-group">
+        <label>Confirmer le nouveau mot de passe *</label>
+       <div class="password-wrapper">
+  <input type="password" id="forgotConfirmPass" placeholder="Retaper le mot de passe">
+  <button type="button" class="password-toggle" onclick="togglePassword('forgotConfirmPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+      </div>
+
+      <div id="forgotMessage3" style="margin:12px 0;font-size:14px;"></div>
+
+      <button class="btn-primary" id="forgotBtn3" onclick="submitForgotStep3()" style="width:100%;">
+        ✅ Valider le nouveau mot de passe
+      </button>
+    </div>
+
+    <!-- ÉTAPE 4 : Succès -->
+    <div id="forgotStepSuccess" style="display:none;text-align:center;">
+      <div style="font-size:60px;margin-bottom:15px;">✅</div>
+      <h2 style="color:#0a8754;margin-bottom:15px;">Mot de passe modifié !</h2>
+      <p style="color:#666;margin-bottom:20px;">
+        Votre nouveau mot de passe est actif.<br>
+        Vous pouvez maintenant vous connecter.
+      </p>
+      <button class="btn-primary" onclick="closeForgotPasswordModal();openAuth()" style="width:100%;">
+        🔑 Se connecter
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL ZOOM IMAGE PRODUIT -->
+<div id="zoomModal" class="zoom-modal" onclick="closeZoomFromBackdrop(event)">
+  <div class="zoom-container">
+    <!-- Bouton fermer -->
+    <button class="zoom-close" onclick="closeZoomModal()" title="Fermer (Échap)">×</button>
+
+    <!-- Flèche gauche -->
+    <button class="zoom-nav zoom-prev" onclick="zoomPrevious()" title="Précédent (←)" id="zoomPrevBtn">‹</button>
+
+    <!-- Image principale -->
+    <div class="zoom-image-wrapper" id="zoomImageWrapper">
+      <img id="zoomImage" src="" alt="Zoom" draggable="false">
+    </div>
+
+    <!-- Flèche droite -->
+    <button class="zoom-nav zoom-next" onclick="zoomNext()" title="Suivant (→)" id="zoomNextBtn">›</button>
+
+    <!-- Barre d'infos -->
+    <div class="zoom-info">
+      <span id="zoomCounter">1 / 1</span>
+      <span class="zoom-hint">🔍 Molette pour zoomer · Glisser pour déplacer</span>
+      <button class="zoom-reset" onclick="resetZoom()" title="Réinitialiser (R)">↺ Réinitialiser</button>
+    </div>
+
+    <!-- Vignettes -->
+    <div class="zoom-thumbnails" id="zoomThumbnails"></div>
+  </div>
+</div>
+
+
+<!-- MODAL CHANGER MOT DE PASSE -->
+<div id="passwordModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closePasswordModal()">×</span>
+    <h2>🔐 Changer mon mot de passe</h2>
+    <p style="color:#666;font-size:14px;margin-bottom:20px;">
+      Pour des raisons de sécurité, saisissez votre mot de passe actuel puis le nouveau.
+    </p>
+
+    <div class="form-group">
+      <label>Mot de passe actuel *</label>
+      <div class="password-wrapper">
+  <input type="password" id="currentPass" placeholder="Votre mot de passe actuel">
+  <button type="button" class="password-toggle" onclick="togglePassword('currentPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+    </div>
+
+    <div class="form-group">
+      <label>Nouveau mot de passe *</label>
+      <div class="password-wrapper">
+      <input type="password" id="newPass" placeholder="Minimum 6 caractères">
+  <button type="button" class="password-toggle" onclick="togglePassword('newPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+      <small class="hint">Le nouveau mot de passe doit contenir au moins 6 caractères.</small>
+    </div>
+
+    <div class="form-group">
+      <label>Confirmer le nouveau mot de passe *</label>
+      <div class="password-wrapper">
+  <input type="password" id="confirmPass" placeholder="Retaper le nouveau mot de passe">
+  <button type="button" class="password-toggle" onclick="togglePassword('confirmPass', this)" title="Afficher le mot de passe">👁️</button>
+</div>
+    </div>
+
+    <div id="passwordMessage" style="margin-bottom:12px;font-size:14px;"></div>
+
+    <button class="btn-primary" onclick="submitPasswordChange()" style="width:100%;">
+      ✅ Valider le changement
+    </button>
+    <button class="btn-secondary" onclick="closePasswordModal()" style="width:100%;margin-top:8px;">
+      Annuler
+    </button>
+  </div>
+</div>
+
+
 <!-- MODAL CONTACT EMAIL -->
 <div id="contactEmailModal" class="modal">
   <div class="modal-content">
@@ -305,6 +1172,66 @@
     <input id="emailSujet" placeholder="Sujet">
     <textarea id="emailMessage" placeholder="Votre message..." style="min-height:120px;"></textarea>
     <button class="btn-primary" onclick="submitContactEmail()" style="width:100%;">Envoyer</button>
+  </div>
+</div>
+
+<!-- MODALE COMPTE SUSPENDU -->
+<div id="bannedModal" class="modal banned-modal">
+  <div class="modal-content banned-content">
+    <div class="banned-icon">🚫</div>
+    <h2 class="banned-title">Votre compte a été suspendu</h2>
+    <p class="banned-subtitle">
+      Nous sommes désolés de vous informer que votre compte a été temporairement suspendu.
+    </p>
+
+    <div class="banned-info">
+      <div class="banned-info-line">
+        <strong>📋 Motif :</strong>
+        <span id="bannedMotif">—</span>
+      </div>
+      <div class="banned-info-line" id="bannedDateLine" style="display:none;">
+        <strong>📅 Date :</strong>
+        <span id="bannedDate">—</span>
+      </div>
+    </div>
+
+    <p class="banned-help">
+      Pour contester cette décision ou obtenir plus d'informations, contactez-nous directement :
+    </p>
+
+    <div class="banned-actions">
+      <a id="bannedCall" class="banned-btn banned-call" href="tel:+22788893490">
+        <span class="banned-btn-icon">📞</span>
+        <span class="banned-btn-text">
+          <strong>Appeler</strong>
+          <small id="bannedCallNumber">+227 88 89 34 90</small>
+        </span>
+      </a>
+
+      <a id="bannedEmail" class="banned-btn banned-email" href="mailto:moctarmamannigershop@gmail.com" target="_blank">
+        <span class="banned-btn-icon">📧</span>
+        <span class="banned-btn-text">
+          <strong>Email</strong>
+          <small id="bannedEmailAddr">moctarmamannigershop@gmail.com</small>
+        </span>
+      </a>
+
+      <a id="bannedWhatsApp" class="banned-btn banned-whatsapp" href="https://wa.me/22788893490" target="_blank">
+        <span class="banned-btn-icon">💬</span>
+        <span class="banned-btn-text">
+          <strong>WhatsApp</strong>
+          <small>Discussion immédiate</small>
+        </span>
+      </a>
+    </div>
+
+    <p class="banned-delay">
+      ⏱️ Nous traitons les réclamations dans les <strong>48 heures</strong>.
+    </p>
+
+    <button class="banned-close-btn" onclick="fermerModaleBannie()">
+      Fermer
+    </button>
   </div>
 </div>
 
@@ -336,6 +1263,10 @@
           <li><a onclick="showPage('catalogue')">🛍️ Catalogue</a></li>
           <li><a onclick="showPage('partenariat')">🤝 Partenariat</a></li>
           <li><a onclick="showPage('transport')">🚚 Livraison</a></li>
+          <li><a onclick="showPage('contact')">📞 Contact</a></li>
+          <li><a onclick="showPage('legal')">📜 Mentions légales</a></li>
+<li><a onclick="showPage('legal');setTimeout(()=>switchLegalTab(null,'cgv',true),200)">📝 CGV</a></li>
+<li><a onclick="showPage('legal');setTimeout(()=>switchLegalTab(null,'confidentialite',true),200)">🔒 Confidentialité</a></li>
           <li><a onclick="showPage('panier')">🛒 Mon panier</a></li>
         </ul>
       </div>
@@ -385,9 +1316,9 @@
 <a href="tel:+22788893490" class="float-btn call">📞</a>
 
 <div id="toast" class="toast"></div>
+
 <script src="app.js"></script>
 <script>
-// ==================== PWA ====================
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')

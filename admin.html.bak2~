@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — NigerShop</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="icon" type="image/png" href="/uploads/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="container header-inner">
+    <div class="logo">
+      <span style="font-size:28px;">⚙️</span>
+      <span>Niger<strong>Shop Admin</strong></span>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="icon-btn" style="text-decoration:none;color:inherit;">🏠 Site</a>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Mode sombre / clair">🌙</button>
+      <button class="icon-btn" id="adminUserBtn">👤</button>
+    </div>
+  </div>
+</header>
+
+<div class="container" id="adminContent" style="display:none;">
+  <h2 class="section-title">Tableau de bord</h2>
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="admin-tabs">
+    <div class="admin-tab active" onclick="switchAdminTab(event,'produits')">📦 Produits</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'commandes')">🛒 Commandes</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'users')">👥 Utilisateurs</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'messages')">💬 Messages</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'commissions')">💰 Commissions</div>
+    <div class="admin-tab" onclick="switchAdminTab(event,'promo')">🎟️ Codes promo</div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div class="admin-panel active" id="panel-produits">
+    <div class="admin-section">
+      <h3 id="formTitle">➕ Ajouter un produit</h3>
+      <input type="hidden" id="pId">
+      <label>Nom du produit *</label>
+      <input id="pNom" placeholder="Ex: Smartphone Tecno">
+      <label>Description</label>
+      <textarea id="pDesc" placeholder="Description..."></textarea>
+      <div class="admin-row">
+        <div><label>Prix actuel (FCFA) *</label><input id="pPrix" type="number"></div>
+        <div><label>Ancien prix (FCFA) <small style="color:#999;">— optionnel, pour afficher une promo</small></label><input id="pAncienPrix" type="number"></div>
+      </div>
+    <div class="admin-row">
+      <div><label>Stock</label><input id="pStock" type="number" value="0"></div>
+      <div></div>
+    </div>
+      <label>Catégorie</label>
+      <select id="pCat">
+        <option>Électronique</option><option>Alimentation</option>
+        <option>Mode</option><option>Textiles</option><option>Véhicules</option>
+        <option>Maison</option><option>Divers</option>
+      </select>
+      <label>Images (jusqu'à 10 photos)</label>
+      <input id="pImages" type="file" accept="image/*" multiple>
+      <button class="btn-primary" onclick="saveProduit()" style="width:100%;margin-top:10px;">💾 Enregistrer</button>
+      <button class="btn-secondary" onclick="resetForm()" style="width:100%;">Annuler</button>
+    </div>
+
+    <div class="admin-section">
+      <h3>📦 Produits existants</h3>
+      <div id="adminProductList"></div>
+    </div>
+  </div>
+
+  <!-- COMMANDES -->
+  <div class="admin-panel" id="panel-commandes">
+    <div class="admin-section">
+      <h3>🛒 Toutes les commandes</h3>
+      <div id="adminCommandeList"></div>
+    </div>
+  </div>
+
+  <!-- USERS -->
+  <div class="admin-panel" id="panel-users">
+    <div class="admin-section">
+      <h3>👥 Tous les utilisateurs</h3>
+      <div id="adminUserList"></div>
+    </div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div class="admin-panel" id="panel-messages">
+    <div class="admin-section">
+      <h3>💬 Toutes les conversations</h3>
+      <div id="adminMessageList"></div>
+    </div>
+  </div>
+    <!-- PROMO -->
+  <div class="admin-panel" id="panel-promo">
+    <div class="admin-section">
+      <h3>➕ Créer un code promo</h3>
+      <label>Code (sera mis en majuscules) *</label>
+      <input id="promoCode" placeholder="Ex: PROMO10" style="text-transform:uppercase;">
+      <label>Type de réduction</label>
+      <select id="promoType">
+        <option value="pourcent">Pourcentage (%)</option>
+        <option value="fixe">Montant fixe (FCFA)</option>
+      </select>
+      <label>Valeur *</label>
+      <input id="promoValeur" type="number" placeholder="Ex: 10 (pour 10%) ou 500 (pour 500 FCFA)">
+      <label>Montant minimum de commande (FCFA)</label>
+      <input id="promoMin" type="number" placeholder="0">
+      <label>Date d'expiration (optionnel)</label>
+      <input id="promoExpiration" type="date">
+      <button class="btn-primary" onclick="creerPromo()" style="width:100%;margin-top:10px;">✅ Créer le code</button>
+    </div>
+
+    <div class="admin-section">
+      <h3>📋 Codes promo existants</h3>
+      <div id="adminPromoList"></div>
+    </div>
+  </div>
+
+  <!-- COMMISSIONS -->
+  <div class="admin-panel" id="panel-commissions">
+    <div class="admin-section">
+      <h3>💰 Commissions de parrainage</h3>
+      <div id="adminCommissionList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN ADMIN -->
+<div class="container" id="loginBox" style="max-width:450px;margin-top:80px;">
+  <div class="admin-section">
+    <h2>🔐 Connexion Admin</h2>
+    <input id="loginEmail" type="email" placeholder="Email admin">
+    <input id="loginPass" type="password" placeholder="Mot de passe">
+    <button class="btn-primary" onclick="adminLogin()" style="width:100%;">Se connecter</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = window.location.origin + '/api';
+let token = localStorage.getItem('token');
+let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let editingId = null;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._t); window._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+function fmt(n) { return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'; }
+
+async function adminLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const mot_de_passe = document.getElementById('loginPass').value;
+  const res = await fetch(`${API}/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, mot_de_passe })
+  });
+  const data = await res.json();
+  if (!res.ok) return showToast('❌ ' + data.message);
+  if (data.user.role !== 'admin') return showToast('❌ Pas administrateur');
+  token = data.token; currentUser = data.user;
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(currentUser));
+  initAdmin();
+}
+
+function initAdmin() {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  document.getElementById('adminUserBtn').textContent = `👤 ${currentUser.nom}`;
+  loadStats(); loadProduits(); loadCommandes(); loadUsers(); loadMessages(); loadCommissions(); loadPromos();
+}
+
+function logoutAdmin() {
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  location.reload();
+}
+document.getElementById('adminUserBtn').onclick = logoutAdmin;
+
+function switchAdminTab(e, tab) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+async function loadStats() {
+  const res = await fetch(`${API}/admin/stats`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const s = await res.json();
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><h3>${s.users}</h3><p>Utilisateurs</p></div>
+    <div class="stat-card"><h3>${s.produits}</h3><p>Produits</p></div>
+    <div class="stat-card"><h3>${s.commandes}</h3><p>Commandes</p></div>
+    <div class="stat-card"><h3>${fmt(s.ca)}</h3><p>Chiffre d'affaires</p></div>
+  `;
+}
+
+async function loadProduits() {
+  const res = await fetch(`${API}/produits`);
+  const list = await res.json();
+  produitsCache = list; // garder en mémoire pour editProduitParId
+
+  document.getElementById('adminProductList').innerHTML = list.map(p => `
+    <div class="admin-list-item">
+      <div style="display:flex;gap:10px;align-items:center;">
+        ${p.images && p.images[0] ? `<img src="${p.images[0]}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;">` : '📦'}
+        <div>
+          <strong>${p.nom}</strong> — ${fmt(p.prix)}
+          ${p.ancien_prix ? `<span style="color:#999;text-decoration:line-through;margin-left:6px;">${fmt(p.ancien_prix)}</span>` : ''}
+          <br>
+          <small style="color:#666;">${p.categorie} · Stock: ${p.stock} · ${(p.images && p.images.length) || 0} photo(s)</small>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-primary btn-sm" onclick="editProduitParId(${p.id})">✏️ Modifier</button>
+        <button class="del-btn" onclick="supprimerProduit(${p.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('') || '<p>Aucun produit.</p>';
+}
+
+// Cache global des produits chargés, pour retrouver facilement par ID
+let produitsCache = [];
+
+async function editProduitParId(id) {
+  // Cherche dans le cache, sinon recharge
+  let p = produitsCache.find(x => x.id === id);
+
+  // Si pas trouvé, recharge la liste
+  if (!p) {
+    const res = await fetch(`${API}/produits`);
+    produitsCache = await res.json();
+    p = produitsCache.find(x => x.id === id);
+  }
+
+  if (!p) {
+    showToast('❌ Produit introuvable');
+    return;
+  }
+
+  // Remplir le formulaire
+  editingId = p.id;
+  document.getElementById('formTitle').textContent = '✏️ Modifier le produit #' + p.id;
+  document.getElementById('pNom').value = p.nom || '';
+  document.getElementById('pDesc').value = p.description || '';
+  document.getElementById('pPrix').value = p.prix || '';
+  document.getElementById('pAncienPrix').value = p.ancien_prix || '';
+  document.getElementById('pStock').value = p.stock || 0;
+  document.getElementById('pCat').value = p.categorie || 'Divers';
+  document.getElementById('pImages').value = ''; // vider le champ file
+
+  // Petit indicateur : combien d'images existent déjà
+  const nbImages = (p.images && p.images.length) || 0;
+  if (nbImages > 0) {
+    showToast(`ℹ️ ${nbImages} image(s) existante(s). Choisis-en de nouvelles pour les remplacer.`);
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById('formTitle').textContent = '➕ Ajouter un produit';
+  ['pNom','pDesc','pPrix','pAncienPrix','pStock','pImages'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('pCat').value = 'Électronique';
+}
+
+async function saveProduit() {
+  const nom = document.getElementById('pNom').value.trim();
+  const prix = document.getElementById('pPrix').value;
+  if (!nom || !prix) return showToast('⚠️ Nom et prix requis');
+  
+  // -------------------------------------------------------------------------------------
+    const el = document.getElementById(id)
+    if (el) el.value = "";
+    document.getElementById(id)
+  //--------------------------------------------------------------------------------------
+
+  const fd = new FormData();
+  fd.append('nom', nom);
+  fd.append('description', document.getElementById('pDesc').value);
+  fd.append('prix', prix);
+  fd.append('ancien_prix', document.getElementById('pAncienPrix').value || '');
+  fd.append('stock', document.getElementById('pStock').value || 0);
+  fd.append('categorie', document.getElementById('pCat').value);
+
+  const files = document.getElementById('pImages').files;
+  for (const f of files) fd.append('images', f);
+
+  const url = editingId ? `${API}/produits/${editingId}` : `${API}/produits`;
+  const method = editingId ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd
+    });
+
+    const data = await res.json();
+    if (!res.ok) return showToast('❌ ' + (data.message || 'Erreur'));
+
+    showToast(editingId ? '✅ Produit modifié' : '✅ Produit ajouté');
+    resetForm();
+    await loadProduits();
+  } catch (err) {
+    console.error(err);
+    showToast('❌ Erreur réseau');
+  }
+}
+
+async function supprimerProduit(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  const res = await fetch(`${API}/produits/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadProduits(); }
+}
+
+async function loadCommandes() {
+  const res = await fetch(`${API}/commandes`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminCommandeList').innerHTML = list.map(c => `
+    <div class="admin-list-item">
+      <div>
+        <strong>#${c.id}</strong> — ${fmt(c.total)} · <span style="color:#ff6b00;">${c.statut}</span><br>
+        <small>${c.client_nom} (${c.client_email}) · ${c.telephone}</small><br>
+        <small>${c.ville_livraison} · ${c.transport} · ${c.paiement}</small><br>
+        <small style="color:#999;">${new Date(c.created_at).toLocaleString('fr-FR')}</small>
+        <div style="margin-top:6px;font-size:13px;color:#666;">
+          ${c.articles.map(a => `• ${a.nom} ×${a.qty}`).join('<br>')}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <select onchange="updateStatut(${c.id}, this.value)" style="padding:6px;border-radius:6px;">
+          <option value="en_attente" ${c.statut==='en_attente'?'selected':''}>En attente</option>
+          <option value="confirmee" ${c.statut==='confirmee'?'selected':''}>Confirmée</option>
+          <option value="expediee" ${c.statut==='expediee'?'selected':''}>Expédiée</option>
+          <option value="livree" ${c.statut==='livree'?'selected':''}>Livrée</option>
+          <option value="annulee" ${c.statut==='annulee'?'selected':''}>Annulée</option>
+        </select>
+        <a href="mailto:${c.client_email}?subject=Commande #${c.id}" class="btn-secondary btn-sm" style="text-decoration:none;text-align:center;">📧 Email</a>
+      </div>
+    </div>
+  `).join('') || '<p>Aucune commande.</p>';
+}
+
+async function updateStatut(id, statut) {
+  const res = await fetch(`${API}/commandes/${id}/statut`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ statut })
+  });
+  if (res.ok) showToast('✅ Statut mis à jour');
+}
+
+async function loadUsers() {
+  const res = await fetch(`${API}/admin/users`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminUserList').innerHTML = list.map(u => `
+    <div class="admin-list-item">
+      <div>
+        <strong>${u.nom}</strong> ${u.verifie ? '✅' : '⏳'} <span style="color:#ff6b00;font-size:12px;">[${u.role}]</span><br>
+        <small>${u.email} · ${u.telephone || 'N/A'} · ${u.ville || 'N/A'}</small><br>
+        <small style="color:#666;">Code parrain : <strong>${u.code_parrain || 'N/A'}</strong></small>
+      </div>
+      <div style="display:flex;gap:6px;">
+        ${u.role === 'vendeur' && !u.verifie
+          ? `<button class="btn-primary btn-sm" onclick="verifierUser(${u.id})">✅ Vérifier</button>` : ''}
+        <a href="mailto:${u.email}" class="btn-secondary btn-sm" style="text-decoration:none;">📧</a>
+        <button class="del-btn" onclick="supprimerUser(${u.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function verifierUser(id) {
+  const res = await fetch(`${API}/admin/users/${id}/verifier`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Vérifié'); loadUsers(); }
+}
+
+async function supprimerUser(id) {
+  if (!confirm('Supprimer cet utilisateur ?')) return;
+  const res = await fetch(`${API}/admin/users/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadUsers(); }
+}
+
+async function loadMessages() {
+  const res = await fetch(`${API}/messages`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminMessageList').innerHTML = list.length ? list.map(m => `
+    <div class="admin-list-item">
+      <div>
+        <strong>${m.exp_nom} → ${m.dest_nom}</strong><br>
+        <span>${m.contenu}</span><br>
+        <small style="color:#999;">${new Date(m.created_at).toLocaleString('fr-FR')}</small>
+      </div>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucun message.</p>';
+}
+
+async function loadCommissions() {
+  const res = await fetch(`${API}/admin/commissions`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const list = await res.json();
+  document.getElementById('adminCommissionList').innerHTML = list.length ? list.map(c => `
+    <div class="admin-list-item">
+      <span><strong>${c.user_nom}</strong> — Niveau ${c.niveau} · <span style="color:#0a8754;font-weight:700;">${fmt(c.montant)}</span></span>
+      <small style="color:#999;">${new Date(c.created_at).toLocaleDateString('fr-FR')}</small>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucune commission.</p>';
+}
+
+// ==================== CODES PROMO ====================
+async function creerPromo() {
+  const code = document.getElementById('promoCode').value.trim();
+  const type = document.getElementById('promoType').value;
+  const valeur = parseFloat(document.getElementById('promoValeur').value);
+  const min_commande = parseFloat(document.getElementById('promoMin').value) || 0;
+  const date_expiration = document.getElementById('promoExpiration').value || null;
+
+  if (!code || !valeur) return showToast('⚠️ Code et valeur requis');
+
+  const res = await fetch(`${API}/admin/promo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ code, type, valeur, min_commande, date_expiration })
+  });
+  const data = await res.json();
+  if (!res.ok) return showToast('❌ ' + data.message);
+
+  showToast('✅ Code promo créé !');
+  document.getElementById('promoCode').value = '';
+  document.getElementById('promoValeur').value = '';
+  document.getElementById('promoMin').value = '';
+  document.getElementById('promoExpiration').value = '';
+  loadPromos();
+}
+
+async function loadPromos() {
+  const res = await fetch(`${API}/admin/promo`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const list = await res.json();
+  document.getElementById('adminPromoList').innerHTML = list.length ? list.map(p => {
+    const valeurAff = p.type === 'pourcent' ? `${p.valeur}%` : fmt(p.valeur);
+    const expire = p.date_expiration
+      ? `<small style="color:#999;">Expire le ${new Date(p.date_expiration).toLocaleDateString('fr-FR')}</small>` : '';
+    return `
+      <div class="admin-list-item">
+        <div>
+          <strong style="font-size:1.2rem;color:#ff6b00;">${p.code}</strong>
+          <span style="margin-left:10px;">-${valeurAff}</span>
+          ${p.min_commande > 0 ? `<small style="color:#666;"> (min. ${fmt(p.min_commande)})</small>` : ''}
+          <span style="margin-left:10px;font-size:12px;background:${p.actif ? '#0a8754' : '#999'};color:#fff;padding:2px 8px;border-radius:10px;">
+            ${p.actif ? 'Actif' : 'Inactif'}
+          </span>
+          <br>
+          <small style="color:#666;">Utilisé ${p.nb_utilisations || 0} fois</small>
+          ${expire ? ' · ' + expire : ''}
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-secondary btn-sm" onclick="togglePromo(${p.id})">
+            ${p.actif ? '⏸️ Désactiver' : '▶️ Activer'}
+          </button>
+          <button class="del-btn" onclick="supprimerPromo(${p.id})">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p>Aucun code promo.</p>';
+}
+
+async function togglePromo(id) {
+  const res = await fetch(`${API}/admin/promo/${id}/toggle`, {
+    method: 'PUT', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('✅ Modifié'); loadPromos(); }
+}
+
+async function supprimerPromo(id) {
+  if (!confirm('Supprimer ce code ?')) return;
+  const res = await fetch(`${API}/admin/promo/${id}`, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) { showToast('🗑️ Supprimé'); loadPromos(); }
+}
+// ==================== DARK MODE ====================
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  const btn = document.getElementById('themeBtn');
+  if (theme === 'dark') {
+    document.body.classList.add('dark');
+    if (btn) btn.textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark');
+    if (btn) btn.textContent = '🌙';
+  }
+  localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+}
+
+initTheme();
+
+// INIT
+if (token && currentUser && currentUser.role === 'admin') initAdmin();
+</script>
+</body>
+</html>

@@ -8,7 +8,733 @@ let authMode = 'login';
 let currentChatUser = null;
 let currentSliderIndex = 0;
 let currentSliderImages = [];
-let promoAppliquee = null; // { code, remise, nouveau_total }
+let promoAppliquee = null;
+// Pagination
+let currentPage = 1;
+const PRODUITS_PAR_PAGE = 20;
+let produitsFiltres = []; // Liste filtrée actuelle (pour la pagination)
+
+// ==================== INTERCEPTEUR GLOBAL : BANNISSEMENT ====================
+// Remplace window.fetch pour détecter automatiquement les 403 "banni"
+(function() {
+  const fetchOriginal = window.fetch;
+  window.fetch = async function(url, options = {}) {
+    const res = await fetchOriginal(url, options);
+
+    // Détecter un bannissement sur les routes API
+    if (res.status === 403 && typeof url === 'string' && url.includes('/api/')) {
+      const cloned = res.clone();
+      try {
+        const data = await cloned.json();
+        if (data.banni) {
+          gererBannissement(data);
+        }
+      } catch (e) {
+        // Pas du JSON ou pas banni → on ignore
+      }
+    }
+
+    return res;
+  };
+})();
+
+// --------------- modifié ----------------------------
+// ==================== CONTACTS SUPPORT ====================
+// ⚠️ MODIFIE CES VALEURS SI TES CONTACTS CHANGENT
+const CONTACT_SUPPORT = {
+  telephone: '+227 88 89 34 90',
+  telephoneRaw: '+22788893490', // sans espaces, pour le lien tel:
+  email: 'moctarmamannigershop@gmail.com',
+  whatsapp: '22788893490' // sans + ni espaces, pour wa.me
+};
+
+function gererBannissement(data) {
+  const motif = data.motif || 'Non précisé';
+  const date = data.date_blocage;
+
+  // Remplir la modale
+  const motifEl = document.getElementById('bannedMotif');
+  if (motifEl) motifEl.textContent = motif;
+
+  // Date (si disponible)
+  const dateLineEl = document.getElementById('bannedDateLine');
+  const dateEl = document.getElementById('bannedDate');
+  if (date && dateEl && dateLineEl) {
+    const dateStr = new Date(date).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    dateEl.textContent = dateStr;
+    dateLineEl.style.display = 'flex';
+  } else if (dateLineEl) {
+    dateLineEl.style.display = 'none';
+  }
+
+  // Bouton Appeler
+  const callEl = document.getElementById('bannedCall');
+  const callNumEl = document.getElementById('bannedCallNumber');
+  if (callEl) callEl.href = 'tel:' + CONTACT_SUPPORT.telephoneRaw;
+  if (callNumEl) callNumEl.textContent = CONTACT_SUPPORT.telephone;
+
+  // Bouton Email (avec sujet et corps préremplis)
+  const emailEl = document.getElementById('bannedEmail');
+  const emailAddrEl = document.getElementById('bannedEmailAddr');
+  if (emailEl) {
+    const sujet = encodeURIComponent('Contestation de suspension de compte');
+    const corps = encodeURIComponent(
+      `Bonjour,\n\nMon compte NigerShop a été suspendu.\n\n` +
+      `Motif indiqué : ${motif}\n` +
+      `Mon email : ${currentUser?.email || 'N/A'}\n` +
+      `Mon nom : ${currentUser?.nom || 'N/A'}\n\n` +
+      `Je souhaite contester cette décision ou obtenir plus d'informations.\n\n` +
+      `Cordialement.`
+    );
+    emailEl.href = `mailto:${CONTACT_SUPPORT.email}?subject=${sujet}&body=${corps}`;
+  }
+  if (emailAddrEl) emailAddrEl.textContent = CONTACT_SUPPORT.email;
+
+  // Bouton WhatsApp (avec message prérempli)
+  const waEl = document.getElementById('bannedWhatsApp');
+  if (waEl) {
+    const msg = encodeURIComponent(
+      `Bonjour, mon compte NigerShop a été suspendu. Motif : ${motif}. ` +
+      `Je souhaite en savoir plus.`
+    );
+    waEl.href = `https://wa.me/${CONTACT_SUPPORT.whatsapp}?text=${msg}`;
+  }
+  // Mémoriser les infos pour la page dédiée
+  window._bannedMotif = motif;
+  window._bannedDate = date || null; 
+  // Afficher la modale
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.add('open');
+    // Ajouter un bouton "Voir plus de détails" si pas déjà présent
+  const modalContent = modal?.querySelector('.banned-content');
+  if (modalContent && !modalContent.querySelector('.banned-more-link')) {
+    const moreLink = document.createElement('button');
+    moreLink.className = 'banned-more-link';
+    moreLink.innerHTML = 'Voir plus de détails →';
+    moreLink.style.cssText = `
+      background: none;
+      border: none;
+      color: #1976d2;
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 8px;
+      padding: 6px;
+      width: 100%;
+      font-family: inherit;
+    `;
+    moreLink.onclick = () => voirPageSuspendu();
+
+    // Insérer avant le bouton Fermer
+    const closeBtn = modalContent.querySelector('.banned-close-btn');
+    if (closeBtn) {
+      modalContent.insertBefore(moreLink, closeBtn);
+    } else {
+      modalContent.appendChild(moreLink);
+    }
+  }
+  // Déconnecter l'utilisateur (mais garder la modale visible)
+  token = null;
+  currentUser = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('panier');
+  panier = [];
+
+  // Mettre à jour le bouton d'auth sans changer de page
+  try {
+    if (typeof updateAuthBtn === 'function') updateAuthBtn();
+  } catch (e) {}
+
+  // Fermer les autres modales
+  document.querySelectorAll('.modal.open').forEach(m => {
+    if (m.id !== 'bannedModal') m.classList.remove('open');
+  });
+}
+
+function fermerModaleBannie() {
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.remove('open');
+
+  // Retour à l'accueil
+  try {
+    if (typeof showPage === 'function') showPage('home');
+  } catch (e) {}
+}
+
+// --------------------- modifié ---------------------
+// ==================== PAGE LÉGALE ====================
+function switchLegalTab(event, tab, programmatic) {
+  // Si appelé par lien interne (programmatic), ne pas utiliser event
+  if (!programmatic && event) {
+    event.preventDefault();
+  }
+
+  // Désactiver tous les onglets
+  document.querySelectorAll('.legal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.legal-content').forEach(c => c.classList.remove('active'));
+
+  // Activer l'onglet ciblé
+  const targetContent = document.getElementById('legal-' + tab);
+  if (targetContent) targetContent.classList.add('active');
+
+  // Activer le bouton correspondant
+  const tabIndex = { 'mentions': 0, 'cgv': 1, 'confidentialite': 2 };
+  const tabButtons = document.querySelectorAll('.legal-tab');
+  if (tabButtons[tabIndex[tab]]) {
+    tabButtons[tabIndex[tab]].classList.add('active');
+  }
+
+  // Scroll en haut de la page légale
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+// ------------------ modifié --------------------------
+
+ // ==================== MOT DE PASSE OUBLIÉ (3 étapes) ====================
+let forgotEmail = '';
+let forgotVerifiedCode = null;
+
+function openForgotPasswordModal() {
+  closeAuth();
+  resetForgotModal();
+  document.getElementById('forgotPasswordModal').classList.add('open');
+}
+
+function closeForgotPasswordModal() {
+  document.getElementById('forgotPasswordModal').classList.remove('open');
+  setTimeout(resetForgotModal, 300);
+}
+
+function resetForgotModal() {
+  // Réinitialiser toutes les étapes
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotStep3').style.display = 'none';
+  document.getElementById('forgotStepSuccess').style.display = 'none';
+
+  // Vider les champs
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotCode').value = '';
+  document.getElementById('forgotNewPass').value = '';
+  document.getElementById('forgotConfirmPass').value = '';
+
+  // Vider les messages
+  ['forgotMessage1','forgotMessage2','forgotMessage3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+
+  forgotEmail = '';
+  forgotVerifiedCode = null;
+}
+
+// ---------- ÉTAPE 1 : Envoyer le code ----------
+async function submitForgotStep1() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotMessage1');
+  const btn = document.getElementById('forgotBtn1');
+
+  if (!email) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Saisissez votre email';
+    return;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Adresse email invalide';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Envoi en cours...';
+
+  try {
+    const res = await fetch(`${API}/auth/mot-de-passe-oublie`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 403 && data.banni) {
+        gererBannissement(data);
+        return;
+      }
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Succès → passer à l'étape 2
+    forgotEmail = email;
+    document.getElementById('forgotEmailDisplay').textContent = email;
+
+    document.getElementById('forgotStep1').style.display = 'none';
+    document.getElementById('forgotStep2').style.display = 'block';
+
+    // Focus sur le champ code
+    setTimeout(() => document.getElementById('forgotCode').focus(), 100);
+
+    showToast('📧 Code envoyé ! Vérifiez votre boîte email.');
+
+    // Message visuel (au cas où)
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = '';
+
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- ÉTAPE 2 : Vérifier le code ----------
+async function submitForgotStep2() {
+  const code = document.getElementById('forgotCode').value.trim();
+  const msgEl = document.getElementById('forgotMessage2');
+  const btn = document.getElementById('forgotBtn2');
+
+  if (!code || code.length !== 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Entrez les 6 chiffres du code';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Vérification...';
+
+  try {
+    const res = await fetch(`${API}/auth/verifier-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail, code })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Code validé → passer à l'étape 3
+    forgotVerifiedCode = code;
+    document.getElementById('forgotStep2').style.display = 'none';
+    document.getElementById('forgotStep3').style.display = 'block';
+
+    setTimeout(() => document.getElementById('forgotNewPass').focus(), 100);
+    showToast('✅ Code vérifié !');
+
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- ÉTAPE 3 : Changer le mot de passe ----------
+async function submitForgotStep3() {
+  const nouveau = document.getElementById('forgotNewPass').value;
+  const confirm = document.getElementById('forgotConfirmPass').value;
+  const msgEl = document.getElementById('forgotMessage3');
+  const btn = document.getElementById('forgotBtn3');
+
+  if (!nouveau || !confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Remplissez tous les champs';
+    return;
+  }
+
+  if (nouveau.length < 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Minimum 6 caractères';
+    return;
+  }
+
+  if (nouveau !== confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Les mots de passe ne correspondent pas';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Modification...';
+
+  try {
+    const res = await fetch(`${API}/auth/reinitialiser-mdp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: forgotEmail,
+        code: forgotVerifiedCode,
+        nouveau_mot_de_passe: nouveau
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Succès → afficher l'écran final
+    document.getElementById('forgotStep3').style.display = 'none';
+    document.getElementById('forgotStepSuccess').style.display = 'block';
+
+    showToast('🎉 Mot de passe modifié !');
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- Bouton "Renvoyer le code" ----------
+async function resendForgotCode() {
+  const btn = document.getElementById('resendBtn');
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Envoi...';
+
+  try {
+    const res = await fetch(`${API}/auth/mot-de-passe-oublie`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast('❌ ' + (data.message || 'Erreur'));
+    } else {
+      showToast('📧 Nouveau code envoyé !');
+      document.getElementById('forgotCode').value = '';
+    }
+  } catch (err) {
+    showToast('❌ Erreur réseau');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- Retour à l'étape 1 ----------
+function backToForgotStep1() {
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotMessage2').textContent = '';
+  document.getElementById('forgotCode').value = '';
+}
+
+
+//-------------------- modifié -------------------------
+    // ==================== CHANGER MOT DE PASSE ====================
+function openPasswordModal() {
+  if (!token || !currentUser) {
+    return openAuth();
+  }
+
+  // Vider les champs
+  document.getElementById('currentPass').value = '';
+  document.getElementById('newPass').value = '';
+  document.getElementById('confirmPass').value = '';
+  document.getElementById('passwordMessage').textContent = '';
+
+  // Ouvrir la modale
+  document.getElementById('passwordModal').classList.add('open');
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.remove('open');
+}
+
+async function submitPasswordChange() {
+  const ancien = document.getElementById('currentPass').value;
+  const nouveau = document.getElementById('newPass').value;
+  const confirm = document.getElementById('confirmPass').value;
+  const msgEl = document.getElementById('passwordMessage');
+
+  // Réinitialiser le message
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  // Validations côté client
+  if (!ancien || !nouveau || !confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Remplissez tous les champs';
+    return;
+  }
+
+  if (nouveau.length < 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit contenir au moins 6 caractères';
+    return;
+  }
+
+  if (nouveau !== confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Les deux nouveaux mots de passe ne correspondent pas';
+    return;
+  }
+
+  if (ancien === nouveau) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit être différent de l\'ancien';
+    return;
+  }
+
+  // Envoi au serveur
+  try {
+    const res = await fetch(`${API}/user/changer-mot-de-passe`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        ancien_mot_de_passe: ancien,
+        nouveau_mot_de_passe: nouveau
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      return;
+    }
+
+    // Succès
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = '✅ ' + data.message;
+    showToast('🔐 Mot de passe modifié avec succès');
+
+    // Vider les champs
+    document.getElementById('currentPass').value = '';
+    document.getElementById('newPass').value = '';
+    document.getElementById('confirmPass').value = '';
+
+    // Fermer la modale après 2 secondes
+    setTimeout(() => {
+      closePasswordModal();
+    }, 2000);
+  } catch (err) {
+    console.error('Erreur changement mdp:', err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau. Réessayez.';
+  }
+}
+
+// ------------------ modifié --------------------------
+// ==================== CONTACT ====================
+async function submitContactForm(event) {
+  event.preventDefault();
+
+  const nom = document.getElementById('contactNom').value.trim();
+  const email = document.getElementById('contactEmail').value.trim();
+  const telephone = document.getElementById('contactTel').value.trim();
+  const sujet = document.getElementById('contactSujet').value;
+  const message = document.getElementById('contactMessage').value.trim();
+
+  // Validation
+  if (!nom || !email || !sujet || !message) {
+    return showToast('⚠️ Remplissez tous les champs obligatoires (*)');
+  }
+
+  // Validation email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return showToast('⚠️ Adresse email invalide');
+  }
+
+  // Désactiver le bouton pendant l'envoi
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '⏳ Envoi en cours...';
+
+  try {
+    const res = await fetch(`${API}/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nom, email, telephone, sujet, message })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+      return showToast('❌ ' + (data.message || 'Erreur'));
+    }
+
+    // Succès
+    showToast('✅ Message envoyé ! Nous vous répondrons sous 48h.');
+
+    // Réinitialiser le formulaire
+    document.getElementById('contactForm').reset();
+
+    // Message de confirmation visuel
+    const formBox = document.querySelector('.contact-form-box');
+    if (formBox) {
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = `
+        background: #0a8754;
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 20px;
+        text-align: center;
+        font-size: 15px;
+      `;
+      successDiv.innerHTML = `
+        <div style="font-size: 40px;margin-bottom: 10px;">✅</div>
+        <strong>Message envoyé avec succès !</strong>
+        <p style="margin-top: 8px;font-size: 14px;opacity: 0.95;">
+          Nous vous répondrons sous <strong>48 heures ouvrées</strong> à l'adresse <strong>${email}</strong>.
+        </p>
+      `;
+      formBox.appendChild(successDiv);
+
+      // Faire disparaître le message après 10 secondes
+      setTimeout(() => {
+        successDiv.style.transition = 'opacity 0.5s';
+        successDiv.style.opacity = '0';
+        setTimeout(() => successDiv.remove(), 500);
+      }, 10000);
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  } catch (err) {
+    console.error('Erreur contact:', err);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+    showToast('❌ Erreur réseau. Vérifiez votre connexion.');
+  }
+}
+
+//---------------- modifié -------------------------
+// ==================== PAGE COMPTE SUSPENDU ====================
+function afficherPageSuspendu(motif, dateBlocage) {
+  // Remplir le motif
+  const motifEl = document.getElementById('pageSuspenduMotif');
+  if (motifEl) motifEl.textContent = motif || 'Non précisé';
+
+  // Date et durée
+  const dateLineEl = document.getElementById('pageSuspenduDateLine');
+  const dateEl = document.getElementById('pageSuspenduDate');
+  const dureeLineEl = document.getElementById('pageSuspenduDureeLine');
+  const dureeEl = document.getElementById('pageSuspenduDuree');
+
+  if (dateBlocage && dateEl && dateLineEl) {
+    const dateStr = new Date(dateBlocage).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    dateEl.textContent = dateStr;
+    dateLineEl.style.display = 'flex';
+
+    // Calcul de la durée
+    if (dureeEl && dureeLineEl) {
+      const ms = Date.now() - new Date(dateBlocage).getTime();
+      const heures = Math.floor(ms / (1000 * 60 * 60));
+      const jours = Math.floor(heures / 24);
+      let dureeTxt = '';
+      if (jours > 0) dureeTxt = `${jours} jour${jours > 1 ? 's' : ''}`;
+      else if (heures > 0) dureeTxt = `${heures} heure${heures > 1 ? 's' : ''}`;
+      else dureeTxt = 'moins d\'une heure';
+
+      dureeEl.textContent = dureeTxt;
+      dureeLineEl.style.display = 'flex';
+    }
+  } else {
+    if (dateLineEl) dateLineEl.style.display = 'none';
+    if (dureeLineEl) dureeLineEl.style.display = 'none';
+  }
+
+  // Boutons de contact
+  const callEl = document.getElementById('pageSuspenduCall');
+  const callNumEl = document.getElementById('pageSuspenduCallNum');
+  if (callEl) callEl.href = 'tel:' + CONTACT_SUPPORT.telephoneRaw;
+  if (callNumEl) callNumEl.textContent = CONTACT_SUPPORT.telephone;
+
+  const emailEl = document.getElementById('pageSuspenduEmail');
+  const emailAddrEl = document.getElementById('pageSuspenduEmailAddr');
+  if (emailEl) {
+    const sujet = encodeURIComponent('Contestation de suspension de compte');
+    const corps = encodeURIComponent(
+      `Bonjour,\n\nMon compte NigerShop a été suspendu.\n\n` +
+      `Motif indiqué : ${motif || 'Non précisé'}\n\n` +
+      `Je souhaite contester cette décision ou obtenir plus d'informations.\n\n` +
+      `Cordialement.`
+    );
+    emailEl.href = `mailto:${CONTACT_SUPPORT.email}?subject=${sujet}&body=${corps}`;
+  }
+  if (emailAddrEl) emailAddrEl.textContent = CONTACT_SUPPORT.email;
+
+  const waEl = document.getElementById('pageSuspenduWhatsApp');
+  if (waEl) {
+    const msg = encodeURIComponent(
+      `Bonjour, mon compte NigerShop a été suspendu. Motif : ${motif || 'Non précisé'}. Je souhaite en savoir plus.`
+    );
+    waEl.href = `https://wa.me/${CONTACT_SUPPORT.whatsapp}?text=${msg}`;
+  }
+
+  // Mettre à jour l'URL (permet de partager la page)
+  try {
+    window.history.pushState({ page: 'suspendu' }, '', '#compte-suspendu');
+  } catch (e) {}
+
+  // Afficher la page
+  showPage('suspendu');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Lien depuis la modale vers la page complète
+function voirPageSuspendu() {
+  const motif = document.getElementById('bannedMotif')?.textContent || '';
+  const dateStr = document.getElementById('bannedDate')?.textContent || '';
+  const dateLine = document.getElementById('bannedDateLine');
+  const date = (dateLine && dateLine.style.display !== 'none') ? dateStr : null;
+
+  // Fermer la modale
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.remove('open');
+
+  afficherPageSuspendu(motif, date);
+}
+// --------------  modifié -------------------------
 
 // ==================== NAVIGATION ====================
 function showPage(name) {
@@ -29,9 +755,18 @@ async function loadProduits() {
   try {
     const res = await fetch(`${API}/produits`);
     produits = await res.json();
+
+    // Page d'accueil : 4 produits populaires
     renderProducts(produits, 'homeProducts', 4);
-    renderProducts(produits, 'catalogueProducts');
-  } catch (e) { showToast('⚠️ Serveur inaccessible'); }
+
+    // Catalogue : initialiser la liste filtrée + afficher page 1
+    produitsFiltres = [...produits];
+    currentPage = 1;
+    afficherPageProduits(produitsFiltres, 1);
+  } catch (e) {
+    console.error(e);
+    showToast('⚠️ Serveur inaccessible');
+  }
 }
 
 function renderProducts(list, targetId, limit) {
@@ -45,7 +780,7 @@ function renderProducts(list, targetId, limit) {
   el.innerHTML = items.map(p => {
     const img = p.images?.[0] || null;
     const stars = '★'.repeat(Math.round(p.note_moyenne || 0)) +
-                  '☆'.repeat(5 - Math.round(p.note_moyenne || 0)); 
+                  '☆'.repeat(5 - Math.round(p.note_moyenne || 0));
     return `
 <div class="product-card">
   <div class="product-image" onclick="openProduit(${p.id})" style="cursor:pointer;">
@@ -67,9 +802,9 @@ function renderProducts(list, targetId, limit) {
         : ''}
     </div>
     <div style="display:flex;gap:6px;">
-  <button class="btn-primary" onclick="addToCart(${p.id})" style="flex:1;">🛒 Ajouter</button>
-  <button class="btn-secondary" onclick="partagerProduit(${p.id})" style="margin-top:0;padding:10px 14px;" title="Partager">📤</button>
-</div>
+      <button class="btn-primary" onclick="addToCart(${p.id})" style="flex:1;">🛒 Ajouter</button>
+      <button class="btn-secondary" onclick="partagerProduit(${p.id})" style="margin-top:0;padding:10px 14px;" title="Partager">📤</button>
+    </div>
   </div>
 </div>`;
   }).join('');
@@ -78,6 +813,23 @@ function renderProducts(list, targetId, limit) {
 function formatPrice(n) {
   return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA';
 }
+// -------------------- modifié ---------------------------
+// Ouvrir le zoom depuis la page produit
+let produitImagesActuelles = []; // Stocker les images du produit en cours
+
+function ouvrirZoomProduit() {
+  if (!produitImagesActuelles || !produitImagesActuelles.length) {
+    // Fallback : essayer de récupérer depuis le DOM
+    const sliderImg = document.getElementById('sliderImg');
+    if (sliderImg && sliderImg.src) {
+      produitImagesActuelles = [sliderImg.src];
+    } else {
+      return;
+    }
+  }
+  openZoomModal(produitImagesActuelles, currentSliderIndex || 0);
+}
+// ------------------- modifié  ---------------------------
 
 // ==================== DETAIL PRODUIT ====================
 async function openProduit(id) {
@@ -86,6 +838,8 @@ async function openProduit(id) {
   const p = await res.json();
   currentSliderIndex = 0;
   currentSliderImages = p.images || [];
+    // Sauvegarder les images pour le zoom
+  produitImagesActuelles = p.images || [];
 
   if (token) {
     fetch(`${API}/historique`, {
@@ -104,7 +858,7 @@ async function openProduit(id) {
       <div>
         <div class="slider">
           ${p.images.length
-            ? `<img id="sliderImg" src="${p.images[0]}">`
+            ? `<img id="sliderImg" src="${p.images[0]}" onclick="ouvrirZoomProduit()" style="cursor:zoom-in;" title="Cliquez pour zoomer">`
             : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:100px;">📦</div>`}
           ${p.images.length > 1 ? `
             <div class="slider-nav">
@@ -135,6 +889,7 @@ async function openProduit(id) {
           <button class="btn-secondary" onclick="toggleFavori(${p.id},this)">❤️ Favoris</button>
           <button class="btn-secondary" onclick="contactVendeur(${p.vendeur_id}, ${p.id})">💬 Contacter</button>
           <button class="btn-secondary" onclick="partagerProduit(${p.id})">📤 Partager</button>
+          <button class="btn-secondary" onclick="ouvrirZoomProduit()">🔍 Agrandir</button>
         </div>
       </div>
     </div>
@@ -200,7 +955,7 @@ async function submitAvis(pid) {
     body: JSON.stringify({ note, texte })
   });
   if (res.ok) { showToast('✅ Avis publié'); openProduit(pid); }
-  else showToast('❌ Erreur');
+  else if (res.status !== 403) showToast('❌ Erreur');
 }
 
 // ==================== FAVORIS ====================
@@ -220,6 +975,7 @@ async function toggleFavori(pid, btn) {
 async function loadFavoris() {
   if (!token) return openAuth();
   const res = await fetch(`${API}/favoris`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
   const list = await res.json();
   renderProducts(list, 'favorisList');
 }
@@ -228,6 +984,7 @@ async function loadFavoris() {
 async function loadHistorique() {
   if (!token) return openAuth();
   const res = await fetch(`${API}/historique`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
   const list = await res.json();
   document.getElementById('historiqueList').innerHTML = list.length ? list.map(h => `
     <div class="admin-list-item">
@@ -241,6 +998,7 @@ async function loadHistorique() {
 async function loadMesCommandes() {
   if (!token) return openAuth();
   const res = await fetch(`${API}/commandes`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
   const list = await res.json();
   document.getElementById('mesCommandes').innerHTML = list.length ? list.map(c => `
     <div class="admin-list-item">
@@ -264,8 +1022,10 @@ async function contactVendeur(vendeurId, produitId) {
 
 async function loadMessages() {
   if (!token) return openAuth();
-  document.getElementById('chatView').style.display = 'none';
+  const chatView = document.getElementById('chatView');
+  if (chatView) chatView.style.display = 'none';
   const res = await fetch(`${API}/messages`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
   const list = await res.json();
   const byUser = {};
   list.forEach(m => {
@@ -290,6 +1050,7 @@ async function openChat(userId) {
   document.getElementById('chatHeader').textContent = `Conversation #${userId}`;
   const res = await fetch(`${API}/messages/${userId}`,
     { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
   const list = await res.json();
   document.getElementById('chatMessages').innerHTML = list.map(m => `
     <div class="chat-msg ${m.expediteur_id === currentUser.id ? 'me' : 'other'}">${m.contenu}</div>
@@ -326,7 +1087,7 @@ async function submitContactEmail() {
     body: JSON.stringify({ destinataire_id: currentChatUser, sujet, message })
   });
   if (res.ok) { showToast('✅ Email envoyé'); closeContactEmail(); }
-  else showToast('❌ Erreur');
+  else if (res.status !== 403) showToast('❌ Erreur');
 }
 
 // ==================== PANIER ====================
@@ -355,12 +1116,14 @@ function changeQty(id, delta) {
 
 function savePanier() {
   localStorage.setItem('panier', JSON.stringify(panier));
-  document.getElementById('cartCount').textContent = panier.reduce((s, i) => s + i.qty, 0);
+  const cc = document.getElementById('cartCount');
+  if (cc) cc.textContent = panier.reduce((s, i) => s + i.qty, 0);
 }
 
 function renderCart() {
   const el = document.getElementById('cartItems');
   const summary = document.getElementById('cartSummary');
+  if (!el || !summary) return;
   if (!panier.length) {
     el.innerHTML = '<p style="text-align:center;color:#666;padding:30px;">Votre panier est vide 😔</p>';
     summary.style.display = 'none';
@@ -385,7 +1148,6 @@ function renderCart() {
 
   const sousTotal = panier.reduce((s, i) => s + i.prix * i.qty, 0);
 
-  // Si un code promo est appliqué, on recalcule la remise sur le nouveau sous-total
   let remise = 0;
   if (promoAppliquee) {
     if (promoAppliquee.type === 'pourcent') remise = Math.round(sousTotal * promoAppliquee.valeur / 100);
@@ -394,7 +1156,6 @@ function renderCart() {
   }
   const totalFinal = sousTotal - remise;
 
-  // Affichage
   document.getElementById('cartTotal').textContent = formatPrice(totalFinal);
 
   const originalLine = document.getElementById('totalOriginal');
@@ -435,6 +1196,7 @@ async function appliquerPromo() {
     const data = await res.json();
 
     if (!res.ok) {
+      if (res.status === 403) return;
       promoAppliquee = null;
       msgEl.style.color = '#d32f2f';
       msgEl.textContent = '❌ ' + data.message;
@@ -471,15 +1233,45 @@ function toggleAuthMode(e) {
   authMode = authMode === 'login' ? 'register' : 'login';
   updateAuthForm();
 }
+
+//-------------------- modifié --------------------------------
 function updateAuthForm() {
   const isReg = authMode === 'register';
+
+  // Titre et bouton principal
   document.getElementById('authTitle').textContent = isReg ? 'Créer un compte' : 'Connexion';
-  document.getElementById('authSubmit').textContent = isReg ? "S'inscrire" : 'Se connecter';
+  document.getElementById('authSubmit').textContent = isReg ? "✨ S'inscrire" : '🔑 Se connecter';
+
+     // Champs supplémentaires visibles uniquement en inscription
   ['authNom','authTel','authVille','authRole','authCodeParrain'].forEach(id => {
-    document.getElementById(id).style.display = isReg ? 'block' : 'none';
+    const el = document.getElementById(id);
+    if (el) el.style.display = isReg ? 'block' : 'none';
   });
-  document.getElementById('authSwitchText').textContent = isReg ? 'Déjà un compte ?' : 'Pas de compte ?';
+
+  // Champ "Confirmer le mot de passe" (dans un wrapper)
+  const confirmWrapper = document.getElementById('authPassConfirmWrapper');
+  if (confirmWrapper) {
+    confirmWrapper.style.display = isReg ? 'block' : 'none';
+  }
+
+  // Texte sous le formulaire + lien bascule
+  const switchTextEl = document.getElementById('authSwitchText');
+  const switchLinkEl = document.getElementById('authSwitchLink');
+
+  if (switchTextEl) {
+    switchTextEl.textContent = isReg ? 'Déjà un compte ?' : 'Pas de compte ?';
+  }
+  if (switchLinkEl) {
+    switchLinkEl.textContent = isReg ? 'Se connecter' : "S'inscrire";
+  }
+
+  // Afficher/Masquer le lien "Mot de passe oublié ?"
+  const forgotLinkEl = document.getElementById('forgotPasswordLink');
+  if (forgotLinkEl) {
+    forgotLinkEl.style.display = isReg ? 'none' : 'block';
+  }
 }
+//------------------- modifié ---------------------------------
 
 async function submitAuth() {
   const email = document.getElementById('authEmail').value.trim();
@@ -491,33 +1283,80 @@ async function submitAuth() {
       body: JSON.stringify({ email, mot_de_passe })
     });
     const data = await res.json();
-    if (!res.ok) return showToast('❌ ' + data.message);
+    if (!res.ok) {
+      // Cas spécial : compte banni
+      if (res.status === 403 && data.banni) {
+        gererBannissement(data);
+        return;
+      }
+      return showToast('❌ ' + data.message);
+    }
     token = data.token; currentUser = data.user;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(currentUser));
     showToast(`👋 Bienvenue ${currentUser.nom}`);
     updateAuthBtn(); closeAuth();
-  } else {
+  }   else {
+    // ===== INSCRIPTION =====
+    const nom = document.getElementById('authNom').value.trim();
+    const telephone = document.getElementById('authTel').value.trim();
+    const ville = document.getElementById('authVille').value.trim();
+    const role = document.getElementById('authRole').value;
+    const codeParrain = document.getElementById('authCodeParrain').value.trim();
+    const motDePasseConfirm = document.getElementById('authPassConfirm').value;
+
+    // Validations
+    if (!nom) {
+      return showToast('⚠️ Nom requis');
+    }
+
+    if (mot_de_passe.length < 6) {
+      return showToast('⚠️ Le mot de passe doit contenir au moins 6 caractères');
+    }
+
+    if (!motDePasseConfirm) {
+      return showToast('⚠️ Confirmez votre mot de passe');
+    }
+
+    if (mot_de_passe !== motDePasseConfirm) {
+      return showToast('❌ Les deux mots de passe ne correspondent pas');
+    }
+
+    // Payload à envoyer
     const payload = {
-      nom: document.getElementById('authNom').value.trim(),
-      email, mot_de_passe,
-      telephone: document.getElementById('authTel').value.trim(),
-      ville: document.getElementById('authVille').value.trim(),
-      role: document.getElementById('authRole').value,
-      code_parrain_utilise: document.getElementById('authCodeParrain').value.trim()
+      nom,
+      email,
+      mot_de_passe,
+      telephone,
+      ville,
+      role,
+      code_parrain_utilise: codeParrain
     };
-    if (!payload.nom) return showToast('⚠️ Nom requis');
+
     const res = await fetch(`${API}/register`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (!res.ok) return showToast('❌ ' + data.message);
-    showToast(`✅ Compte créé ! Code parrain : ${data.code_parrain}`);
-    authMode = 'login'; updateAuthForm();
-  }
-}
 
+    showToast(`✅ Compte créé ! Code parrain : ${data.code_parrain}`);
+
+    // Vider les champs
+    document.getElementById('authNom').value = '';
+    document.getElementById('authTel').value = '';
+    document.getElementById('authVille').value = '';
+    document.getElementById('authPass').value = '';
+    document.getElementById('authPassConfirm').value = '';
+    document.getElementById('authCodeParrain').value = '';
+
+    // Basculer en mode connexion
+    authMode = 'login';
+    updateAuthForm();
+  }};
+
+// ⚠️ ATTENTION : "function" (pas "ffunction")
 function updateAuthBtn() {
   const btn = document.getElementById('authBtn');
   const navMsg = document.getElementById('navMessages');
@@ -525,12 +1364,28 @@ function updateAuthBtn() {
   const mobMsg = document.getElementById('mobNavMessages');
   const mobCmd = document.getElementById('mobNavCommandes');
 
+  if (!btn) return;
+
   if (token && currentUser) {
-    btn.textContent = `👤 ${currentUser.nom.split(' ')[0]}`;
+    btn.textContent = `👤 ${currentUser.nom.split(' ')[0]} ▾`;
+
     if (navMsg) navMsg.style.display = 'inline';
     if (navCmd) navCmd.style.display = 'inline';
     if (mobMsg) mobMsg.style.display = 'block';
     if (mobCmd) mobCmd.style.display = 'block';
+
+    const adminLink = document.getElementById('adminLink');
+    if (adminLink) {
+      adminLink.style.display = (currentUser.role === 'admin') ? 'block' : 'none';
+    }
+
+    const header = document.getElementById('userDropdownHeader');
+    if (header) {
+      header.innerHTML = `
+        <strong>👤 ${currentUser.nom}</strong>
+        <small>${currentUser.email}</small>
+      `;
+    }
 
     const codeEl = document.getElementById('monCodeParrain');
     if (codeEl && currentUser.code_parrain) {
@@ -543,6 +1398,7 @@ function updateAuthBtn() {
     }
   } else {
     btn.textContent = '👤 Connexion';
+
     if (navMsg) navMsg.style.display = 'none';
     if (navCmd) navCmd.style.display = 'none';
     if (mobMsg) mobMsg.style.display = 'none';
@@ -550,13 +1406,44 @@ function updateAuthBtn() {
   }
 }
 
-// ============ MENU MOBILE ============
-function toggleMobileMenu() {
-  document.getElementById('mobileMenu').classList.toggle('open');
+// ==================== MENU UTILISATEUR ====================
+function handleAuthBtn() {
+  if (token && currentUser) {
+    toggleUserMenu();
+  } else {
+    openAuth();
+  }
 }
+
+function toggleUserMenu() {
+  const dd = document.getElementById('userDropdown');
+  if (!dd) return;
+  dd.style.display = (dd.style.display === 'none' || dd.style.display === '') ? 'block' : 'none';
+}
+
+function closeUserMenu() {
+  const dd = document.getElementById('userDropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('userMenuContainer');
+  if (container && !container.contains(e.target)) {
+    closeUserMenu();
+  }
+});
+
+// ==================== MENU MOBILE ====================
+function toggleMobileMenu() {
+  const mm = document.getElementById('mobileMenu');
+  if (mm) mm.classList.toggle('open');
+}
+
 function closeMobileMenu(e) {
+  const mm = document.getElementById('mobileMenu');
+  if (!mm) return;
   if (!e || e.target.id === 'mobileMenu' || (e.target.classList && e.target.classList.contains('mobile-menu-close'))) {
-    document.getElementById('mobileMenu').classList.remove('open');
+    mm.classList.remove('open');
   }
 }
 
@@ -616,7 +1503,10 @@ async function submitCommande() {
     })
   });
   const data = await res.json();
-  if (!res.ok) return showToast('❌ ' + data.message);
+  if (!res.ok) {
+    if (res.status === 403) return;
+    return showToast('❌ ' + data.message);
+  }
 
   showToast('✅ Commande confirmée ! Email envoyé.');
   panier = [];
@@ -630,38 +1520,197 @@ async function submitCommande() {
   if (inpEl) inpEl.value = '';
   showPage('home');
 }
+
+// --------------------- modifié -------------------------
+// ==================== PAGINATION ====================
+function afficherPageProduits(list, page) {
+  currentPage = page;
+
+  const total = list.length;
+  const totalPages = Math.ceil(total / PRODUITS_PAR_PAGE);
+
+  // Calcul de l'intervalle
+  const debut = (page - 1) * PRODUITS_PAR_PAGE;
+  const fin = Math.min(debut + PRODUITS_PAR_PAGE, total);
+
+  // Produits de la page
+  const produitsPage = list.slice(debut, fin);
+
+  // Afficher les produits
+  renderProducts(produitsPage, 'catalogueProducts');
+
+  // Info du haut
+  const infoEl = document.getElementById('catalogueInfo');
+  if (infoEl) {
+    if (total === 0) {
+      infoEl.style.display = 'none';
+    } else {
+      infoEl.style.display = 'block';
+      infoEl.innerHTML = `
+        <strong>${total}</strong> produit${total > 1 ? 's' : ''} trouvé${total > 1 ? 's' : ''}
+        · Affichage <strong>${debut + 1}-${fin}</strong> sur <strong>${total}</strong>
+      `;
+    }
+  }
+
+  // Pagination container
+  const container = document.getElementById('paginationContainer');
+  if (!container) return;
+
+  if (totalPages <= 1) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+
+  // Info
+  const paginationInfo = document.getElementById('paginationInfo');
+  if (paginationInfo) {
+    paginationInfo.textContent = `Page ${page} sur ${totalPages}`;
+  }
+
+  // Bouton Précédent
+  const prevBtn = document.getElementById('paginationPrev');
+  if (prevBtn) prevBtn.disabled = (page === 1);
+
+  // Bouton Suivant
+  const nextBtn = document.getElementById('paginationNext');
+  if (nextBtn) nextBtn.disabled = (page === totalPages);
+
+  // Numéros de page
+  const numbersEl = document.getElementById('paginationNumbers');
+  if (numbersEl) {
+    numbersEl.innerHTML = genererNumerosPages(page, totalPages);
+  }
+
+  // Scroll vers le haut du catalogue (doux)
+  if (page !== 1 || window.scrollY > 300) {
+    const catalogueTitle = document.querySelector('#page-catalogue .section-title');
+    if (catalogueTitle) {
+      catalogueTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+}
+
+function genererNumerosPages(current, total) {
+  const html = [];
+  const maxVisible = 5;
+  let debut = Math.max(1, current - Math.floor(maxVisible / 2));
+  let fin = Math.min(total, debut + maxVisible - 1);
+
+  // Ajuster si on est en fin
+  if (fin - debut + 1 < maxVisible) {
+    debut = Math.max(1, fin - maxVisible + 1);
+  }
+
+  // Première page + ...
+  if (debut > 1) {
+    html.push(`<button class="pagination-number" onclick="goToPage(1)">1</button>`);
+    if (debut > 2) {
+      html.push(`<span class="pagination-dots">…</span>`);
+    }
+  }
+
+  // Numéros visibles
+  for (let i = debut; i <= fin; i++) {
+    html.push(`<button class="pagination-number ${i === current ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`);
+  }
+
+  // ... + dernière page
+  if (fin < total) {
+    if (fin < total - 1) {
+      html.push(`<span class="pagination-dots">…</span>`);
+    }
+    html.push(`<button class="pagination-number" onclick="goToPage(${total})">${total}</button>`);
+  }
+
+  return html.join('');
+}
+
+function goToPage(page) {
+  const total = produitsFiltres.length;
+  const totalPages = Math.ceil(total / PRODUITS_PAR_PAGE);
+
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+
+  afficherPageProduits(produitsFiltres, page);
+}
+
+// -------------------- modifié --------------------------
+
 // ==================== FILTRES ====================
+
 function applyFilters() {
   const cat = document.getElementById('filterCategorie').value;
   const min = parseFloat(document.getElementById('filterPrixMin').value) || 0;
   const max = parseFloat(document.getElementById('filterPrixMax').value) || Infinity;
   const tri = document.getElementById('filterTri').value;
+
   let f = produits.filter(p =>
     (cat === 'tous' || p.categorie === cat) && p.prix >= min && p.prix <= max);
+
   if (tri === 'asc') f.sort((a,b) => a.prix - b.prix);
   else if (tri === 'desc') f.sort((a,b) => b.prix - a.prix);
   else if (tri === 'nom') f.sort((a,b) => a.nom.localeCompare(b.nom));
-  renderProducts(f, 'catalogueProducts');
+
+  // Mettre à jour la liste filtrée
+  produitsFiltres = f;
+  currentPage = 1;
+
+  // Afficher la 1ère page
+  afficherPageProduits(produitsFiltres, 1);
+
   showToast(`🔎 ${f.length} produit(s)`);
 }
+
 function resetFilters() {
   document.getElementById('filterCategorie').value = 'tous';
   document.getElementById('filterPrixMin').value = '';
   document.getElementById('filterPrixMax').value = '';
   document.getElementById('filterTri').value = 'default';
-  renderProducts(produits, 'catalogueProducts');
+
+  produitsFiltres = [...produits];
+  currentPage = 1;
+  afficherPageProduits(produitsFiltres, 1);
 }
+
 document.getElementById('searchInput').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
-  const f = produits.filter(p =>
-    p.nom.toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
-  showPage('catalogue');
-  renderProducts(f, 'catalogueProducts');
-});
 
+  const f = produits.filter(p =>
+    p.nom.toLowerCase().includes(q) ||
+    (p.description || '').toLowerCase().includes(q)
+  );
+
+  showPage('catalogue');
+
+  produitsFiltres = f;
+  currentPage = 1;
+  afficherPageProduits(produitsFiltres, 1);
+});
+// -------------------- modifié --------------------------
+// ==================== AFFICHER/MASQUER MOT DE PASSE ====================
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.title = 'Masquer le mot de passe';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+    btn.title = 'Afficher le mot de passe';
+  }
+}
+// -------------------- modifié --------------------------
 // ==================== UTILS ====================
 function showToast(msg) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(window._t);
@@ -670,30 +1719,6 @@ function showToast(msg) {
 function contactWhatsApp() {
   window.open('https://wa.me/22788893490?text=Bonjour, je souhaite devenir partenaire.', '_blank');
 }
-
-// ==================== INIT ====================
-document.addEventListener('DOMContentLoaded', () => {
-  loadProduits();
-  savePanier();
-  updateAuthBtn();
-  initTheme();
-
-  // Gérer l'ouverture directe d'un produit via URL (partage)
-  const hash = window.location.hash;
-  if (hash && hash.startsWith('#produit-')) {
-    const pid = hash.replace('#produit-', '');
-    setTimeout(() => openProduit(pid), 500);
-  }
-});
-
-// Écoute les changements de hash (navigation arrière/avant)
-window.addEventListener('hashchange', () => {
-  const hash = window.location.hash;
-  if (hash && hash.startsWith('#produit-')) {
-    const pid = hash.replace('#produit-', '');
-    openProduit(pid);
-  }
-});
 
 // ==================== DARK MODE ====================
 function initTheme() {
@@ -719,15 +1744,227 @@ function toggleTheme() {
   const isDark = document.body.classList.contains('dark');
   applyTheme(isDark ? 'light' : 'dark');
 }
+//  ------------------ modifié -----------------------------
+    // ==================== ZOOM IMAGE PRODUIT ====================
+let zoomImages = [];        // Liste des images du produit actuel
+let zoomCurrentIndex = 0;   // Index de l'image affichée
+let zoomScale = 1;          // Niveau de zoom actuel (1 = normal)
+let zoomTranslateX = 0;     // Déplacement horizontal
+let zoomTranslateY = 0;     // Déplacement vertical
+let zoomDragging = false;   // Si on est en train de glisser
+let zoomDragStart = { x: 0, y: 0 };
+let zoomTranslateStart = { x: 0, y: 0 };
 
-// Applique le thème dès le chargement (avant même le DOMContentLoaded)
-initTheme();
+function openZoomModal(images, startIndex = 0) {
+  if (!images || !images.length) return;
 
-// Ré-applique au chargement complet si besoin
+  zoomImages = images;
+  zoomCurrentIndex = startIndex;
+  resetZoom();
+
+  const modal = document.getElementById('zoomModal');
+  if (modal) modal.classList.add('open');
+
+  document.body.style.overflow = 'hidden';
+
+  // Empêcher le scroll en arrière-plan
+  afficherZoomImage();
+
+  // Générer les vignettes
+  afficherZoomThumbnails();
+
+  // Bloquer le scroll de la page
+  document.documentElement.style.overflow = 'hidden';
+}
+
+function closeZoomModal() {
+  const modal = document.getElementById('zoomModal');
+  if (modal) modal.classList.remove('open');
+
+  document.documentElement.style.overflow = '';
+  document.body.style.overflow = '';
+
+  // Réinitialiser
+  zoomImages = [];
+  zoomCurrentIndex = 0;
+  resetZoom();
+}
+
+function closeZoomFromBackdrop(event) {
+  // Fermer seulement si on clique sur le fond (pas sur l'image)
+  if (event.target.id === 'zoomModal') {
+    closeZoomModal();
+  }
+}
+
+function afficherZoomImage() {
+  const img = document.getElementById('zoomImage');
+  if (!img) return;
+
+  img.src = zoomImages[zoomCurrentIndex];
+
+  // Compteur
+  const counter = document.getElementById('zoomCounter');
+  if (counter) {
+    counter.textContent = `${zoomCurrentIndex + 1} / ${zoomImages.length}`;
+  }
+
+  // Flèches
+  const prevBtn = document.getElementById('zoomPrevBtn');
+  const nextBtn = document.getElementById('zoomNextBtn');
+
+  if (prevBtn) prevBtn.disabled = (zoomCurrentIndex === 0);
+  if (nextBtn) nextBtn.disabled = (zoomCurrentIndex === zoomImages.length - 1);
+
+  // Vignettes actives
+  document.querySelectorAll('.zoom-thumbnail').forEach((thumb, idx) => {
+    thumb.classList.toggle('active', idx === zoomCurrentIndex);
+  });
+
+  // Reset zoom
+  resetZoom();
+}
+
+function afficherZoomThumbnails() {
+  const container = document.getElementById('zoomThumbnails');
+  if (!container) return;
+
+  if (zoomImages.length <= 1) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'flex';
+  container.innerHTML = zoomImages.map((url, idx) => `
+    <img src="${url}"
+         class="zoom-thumbnail ${idx === zoomCurrentIndex ? 'active' : ''}"
+         onclick="zoomGoTo(${idx})"
+         alt="Vignette ${idx + 1}">
+  `).join('');
+}
+
+function zoomGoTo(index) {
+  if (index < 0 || index >= zoomImages.length) return;
+  zoomCurrentIndex = index;
+  afficherZoomImage();
+}
+
+function zoomPrevious() {
+  if (zoomCurrentIndex > 0) zoomGoTo(zoomCurrentIndex - 1);
+}
+
+function zoomNext() {
+  if (zoomCurrentIndex < zoomImages.length - 1) zoomGoTo(zoomCurrentIndex + 1);
+}
+
+function resetZoom() {
+  zoomScale = 1;
+  zoomTranslateX = 0;
+  zoomTranslateY = 0;
+  updateZoomTransform();
+}
+
+function updateZoomTransform() {
+  const img = document.getElementById('zoomImage');
+  if (!img) return;
+
+  img.style.transform = `scale(${zoomScale}) translate(${zoomTranslateX}px, ${zoomTranslateY}px)`;
+
+  // Changer le curseur selon le zoom
+  const wrapper = document.getElementById('zoomImageWrapper');
+  if (wrapper) {
+    wrapper.style.cursor = zoomScale > 1 ? 'grab' : 'default';
+  }
+}
+
+// ===== ÉVÉNEMENTS ZOOM =====
 document.addEventListener('DOMContentLoaded', () => {
-  initTheme();
+  const wrapper = document.getElementById('zoomImageWrapper');
+  if (!wrapper) return;
+
+  // --- Molette souris = zoom ---
+  wrapper.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    zoomScale = Math.max(0.5, Math.min(5, zoomScale + delta));
+
+    if (zoomScale <= 1) {
+      zoomTranslateX = 0;
+      zoomTranslateY = 0;
+    }
+
+    updateZoomTransform();
+  }, { passive: false });
+
+  // --- Glisser pour déplacer (souris + touch) ---
+  const startDrag = (e) => {
+    if (zoomScale <= 1) return;
+
+    zoomDragging = true;
+    wrapper.classList.add('grabbing');
+
+    const point = e.touches ? e.touches[0] : e;
+    zoomDragStart = { x: point.clientX, y: point.clientY };
+    zoomTranslateStart = { x: zoomTranslateX, y: zoomTranslateY };
+  };
+
+  const moveDrag = (e) => {
+    if (!zoomDragging) return;
+
+    const point = e.touches ? e.touches[0] : e;
+    const dx = point.clientX - zoomDragStart.x;
+    const dy = point.clientY - zoomDragStart.y;
+
+    zoomTranslateX = zoomTranslateStart.x + dx;
+    zoomTranslateY = zoomTranslateStart.y + dy;
+
+    updateZoomTransform();
+
+    if (e.touches) e.preventDefault();
+  };
+
+  const endDrag = () => {
+    zoomDragging = false;
+    wrapper.classList.remove('grabbing');
+  };
+
+  wrapper.addEventListener('mousedown', startDrag);
+  wrapper.addEventListener('mousemove', moveDrag);
+  wrapper.addEventListener('mouseup', endDrag);
+  wrapper.addEventListener('mouseleave', endDrag);
+
+  wrapper.addEventListener('touchstart', startDrag, { passive: true });
+  wrapper.addEventListener('touchmove', moveDrag, { passive: false });
+  wrapper.addEventListener('touchend', endDrag);
+
+  // --- Double-clic = reset ---
+  wrapper.addEventListener('dblclick', () => {
+    resetZoom();
+  });
 });
 
+// ===== RACCOURCIS CLAVIER =====
+document.addEventListener('keydown', (e) => {
+  const modal = document.getElementById('zoomModal');
+  if (!modal || !modal.classList.contains('open')) return;
+
+  if (e.key === 'Escape') closeZoomModal();
+  if (e.key === 'ArrowLeft') zoomPrevious();
+  if (e.key === 'ArrowRight') zoomNext();
+  if (e.key === 'r' || e.key === 'R') resetZoom();
+  if (e.key === '+' || e.key === '=') {
+    zoomScale = Math.min(5, zoomScale + 0.25);
+    updateZoomTransform();
+  }
+  if (e.key === '-') {
+    zoomScale = Math.max(0.5, zoomScale - 0.25);
+    if (zoomScale <= 1) { zoomTranslateX = 0; zoomTranslateY = 0; }
+    updateZoomTransform();
+  }
+});
+
+// ------------------  modifié --------------------------- 
 // ==================== PARTAGE PRODUIT ====================
 function partagerProduit(produitId) {
   const p = produits.find(x => x.id === produitId);
@@ -746,22 +1983,17 @@ function partagerProduit(produitId) {
     `${(p.description || '').slice(0, 100)}...\n\n` +
     `👉 Voir sur NigerShop : ${url}`;
 
-  // Si le navigateur supporte le partage natif (mobile surtout)
   if (navigator.share) {
     navigator.share({
       title: p.nom,
       text: texte,
       url: url
-    }).catch(() => {
-      // Annulé par l'utilisateur, on ne fait rien
-    });
+    }).catch(() => {});
   } else {
-    // Sinon → WhatsApp Web direct
     const waUrl = 'https://wa.me/?text=' + encodeURIComponent(texte);
     window.open(waUrl, '_blank');
   }
 
-  // Enregistre dans l'historique si connecté
   if (token) {
     fetch(`${API}/historique`, {
       method: 'POST',
@@ -771,7 +2003,6 @@ function partagerProduit(produitId) {
   }
 }
 
-// Copier le lien du produit (optionnel, bouton bonus)
 function copierLienProduit(produitId) {
   const url = window.location.origin + '/#produit-' + produitId;
   navigator.clipboard.writeText(url).then(() => {
@@ -780,3 +2011,39 @@ function copierLienProduit(produitId) {
     showToast('❌ Impossible de copier');
   });
 }
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  loadProduits();
+  savePanier();
+  updateAuthBtn();
+  initTheme();
+
+  // Récupérer le hash UNE SEULE FOIS
+  const hash = window.location.hash;
+
+  // Ouverture directe d'un produit
+  if (hash && hash.startsWith('#produit-')) {
+    const pid = hash.replace('#produit-', '');
+    setTimeout(() => openProduit(pid), 500);
+  }
+
+  // Date de mise à jour légale
+  const legalDateEl = document.getElementById('legalDate');
+  if (legalDateEl) {
+    legalDateEl.textContent = new Date().toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+  }
+});
+
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash;
+  if (hash && hash.startsWith('#produit-')) {
+    const pid = hash.replace('#produit-', '');
+    openProduit(pid);
+  }
+  if (hash && hash.startsWith('#reset-password')) {
+    afficherPageResetPassword();
+  }
+});

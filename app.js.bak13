@@ -1,0 +1,1655 @@
+// ==================== CONFIG ====================
+const API = window.location.origin + '/api';
+let produits = [];
+let panier = JSON.parse(localStorage.getItem('panier') || '[]');
+let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let token = localStorage.getItem('token');
+let authMode = 'login';
+let currentChatUser = null;
+let currentSliderIndex = 0;
+let currentSliderImages = [];
+let promoAppliquee = null;
+
+// ==================== INTERCEPTEUR GLOBAL : BANNISSEMENT ====================
+// Remplace window.fetch pour détecter automatiquement les 403 "banni"
+(function() {
+  const fetchOriginal = window.fetch;
+  window.fetch = async function(url, options = {}) {
+    const res = await fetchOriginal(url, options);
+
+    // Détecter un bannissement sur les routes API
+    if (res.status === 403 && typeof url === 'string' && url.includes('/api/')) {
+      const cloned = res.clone();
+      try {
+        const data = await cloned.json();
+        if (data.banni) {
+          gererBannissement(data);
+        }
+      } catch (e) {
+        // Pas du JSON ou pas banni → on ignore
+      }
+    }
+
+    return res;
+  };
+})();
+
+// --------------- modifié ----------------------------
+// ==================== CONTACTS SUPPORT ====================
+// ⚠️ MODIFIE CES VALEURS SI TES CONTACTS CHANGENT
+const CONTACT_SUPPORT = {
+  telephone: '+227 88 89 34 90',
+  telephoneRaw: '+22788893490', // sans espaces, pour le lien tel:
+  email: 'moctarmamannigershop@gmail.com',
+  whatsapp: '22788893490' // sans + ni espaces, pour wa.me
+};
+
+function gererBannissement(data) {
+  const motif = data.motif || 'Non précisé';
+  const date = data.date_blocage;
+
+  // Remplir la modale
+  const motifEl = document.getElementById('bannedMotif');
+  if (motifEl) motifEl.textContent = motif;
+
+  // Date (si disponible)
+  const dateLineEl = document.getElementById('bannedDateLine');
+  const dateEl = document.getElementById('bannedDate');
+  if (date && dateEl && dateLineEl) {
+    const dateStr = new Date(date).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    dateEl.textContent = dateStr;
+    dateLineEl.style.display = 'flex';
+  } else if (dateLineEl) {
+    dateLineEl.style.display = 'none';
+  }
+
+  // Bouton Appeler
+  const callEl = document.getElementById('bannedCall');
+  const callNumEl = document.getElementById('bannedCallNumber');
+  if (callEl) callEl.href = 'tel:' + CONTACT_SUPPORT.telephoneRaw;
+  if (callNumEl) callNumEl.textContent = CONTACT_SUPPORT.telephone;
+
+  // Bouton Email (avec sujet et corps préremplis)
+  const emailEl = document.getElementById('bannedEmail');
+  const emailAddrEl = document.getElementById('bannedEmailAddr');
+  if (emailEl) {
+    const sujet = encodeURIComponent('Contestation de suspension de compte');
+    const corps = encodeURIComponent(
+      `Bonjour,\n\nMon compte NigerShop a été suspendu.\n\n` +
+      `Motif indiqué : ${motif}\n` +
+      `Mon email : ${currentUser?.email || 'N/A'}\n` +
+      `Mon nom : ${currentUser?.nom || 'N/A'}\n\n` +
+      `Je souhaite contester cette décision ou obtenir plus d'informations.\n\n` +
+      `Cordialement.`
+    );
+    emailEl.href = `mailto:${CONTACT_SUPPORT.email}?subject=${sujet}&body=${corps}`;
+  }
+  if (emailAddrEl) emailAddrEl.textContent = CONTACT_SUPPORT.email;
+
+  // Bouton WhatsApp (avec message prérempli)
+  const waEl = document.getElementById('bannedWhatsApp');
+  if (waEl) {
+    const msg = encodeURIComponent(
+      `Bonjour, mon compte NigerShop a été suspendu. Motif : ${motif}. ` +
+      `Je souhaite en savoir plus.`
+    );
+    waEl.href = `https://wa.me/${CONTACT_SUPPORT.whatsapp}?text=${msg}`;
+  }
+  // Mémoriser les infos pour la page dédiée
+  window._bannedMotif = motif;
+  window._bannedDate = date || null; 
+  // Afficher la modale
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.add('open');
+    // Ajouter un bouton "Voir plus de détails" si pas déjà présent
+  const modalContent = modal?.querySelector('.banned-content');
+  if (modalContent && !modalContent.querySelector('.banned-more-link')) {
+    const moreLink = document.createElement('button');
+    moreLink.className = 'banned-more-link';
+    moreLink.innerHTML = 'Voir plus de détails →';
+    moreLink.style.cssText = `
+      background: none;
+      border: none;
+      color: #1976d2;
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 8px;
+      padding: 6px;
+      width: 100%;
+      font-family: inherit;
+    `;
+    moreLink.onclick = () => voirPageSuspendu();
+
+    // Insérer avant le bouton Fermer
+    const closeBtn = modalContent.querySelector('.banned-close-btn');
+    if (closeBtn) {
+      modalContent.insertBefore(moreLink, closeBtn);
+    } else {
+      modalContent.appendChild(moreLink);
+    }
+  }
+  // Déconnecter l'utilisateur (mais garder la modale visible)
+  token = null;
+  currentUser = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('panier');
+  panier = [];
+
+  // Mettre à jour le bouton d'auth sans changer de page
+  try {
+    if (typeof updateAuthBtn === 'function') updateAuthBtn();
+  } catch (e) {}
+
+  // Fermer les autres modales
+  document.querySelectorAll('.modal.open').forEach(m => {
+    if (m.id !== 'bannedModal') m.classList.remove('open');
+  });
+}
+
+function fermerModaleBannie() {
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.remove('open');
+
+  // Retour à l'accueil
+  try {
+    if (typeof showPage === 'function') showPage('home');
+  } catch (e) {}
+}
+
+// --------------------- modifié ---------------------
+// ==================== PAGE LÉGALE ====================
+function switchLegalTab(event, tab, programmatic) {
+  // Si appelé par lien interne (programmatic), ne pas utiliser event
+  if (!programmatic && event) {
+    event.preventDefault();
+  }
+
+  // Désactiver tous les onglets
+  document.querySelectorAll('.legal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.legal-content').forEach(c => c.classList.remove('active'));
+
+  // Activer l'onglet ciblé
+  const targetContent = document.getElementById('legal-' + tab);
+  if (targetContent) targetContent.classList.add('active');
+
+  // Activer le bouton correspondant
+  const tabIndex = { 'mentions': 0, 'cgv': 1, 'confidentialite': 2 };
+  const tabButtons = document.querySelectorAll('.legal-tab');
+  if (tabButtons[tabIndex[tab]]) {
+    tabButtons[tabIndex[tab]].classList.add('active');
+  }
+
+  // Scroll en haut de la page légale
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+// ------------------ modifié --------------------------
+
+ // ==================== MOT DE PASSE OUBLIÉ (3 étapes) ====================
+let forgotEmail = '';
+let forgotVerifiedCode = null;
+
+function openForgotPasswordModal() {
+  closeAuth();
+  resetForgotModal();
+  document.getElementById('forgotPasswordModal').classList.add('open');
+}
+
+function closeForgotPasswordModal() {
+  document.getElementById('forgotPasswordModal').classList.remove('open');
+  setTimeout(resetForgotModal, 300);
+}
+
+function resetForgotModal() {
+  // Réinitialiser toutes les étapes
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotStep3').style.display = 'none';
+  document.getElementById('forgotStepSuccess').style.display = 'none';
+
+  // Vider les champs
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotCode').value = '';
+  document.getElementById('forgotNewPass').value = '';
+  document.getElementById('forgotConfirmPass').value = '';
+
+  // Vider les messages
+  ['forgotMessage1','forgotMessage2','forgotMessage3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+
+  forgotEmail = '';
+  forgotVerifiedCode = null;
+}
+
+// ---------- ÉTAPE 1 : Envoyer le code ----------
+async function submitForgotStep1() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotMessage1');
+  const btn = document.getElementById('forgotBtn1');
+
+  if (!email) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Saisissez votre email';
+    return;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Adresse email invalide';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Envoi en cours...';
+
+  try {
+    const res = await fetch(`${API}/auth/mot-de-passe-oublie`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 403 && data.banni) {
+        gererBannissement(data);
+        return;
+      }
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Succès → passer à l'étape 2
+    forgotEmail = email;
+    document.getElementById('forgotEmailDisplay').textContent = email;
+
+    document.getElementById('forgotStep1').style.display = 'none';
+    document.getElementById('forgotStep2').style.display = 'block';
+
+    // Focus sur le champ code
+    setTimeout(() => document.getElementById('forgotCode').focus(), 100);
+
+    showToast('📧 Code envoyé ! Vérifiez votre boîte email.');
+
+    // Message visuel (au cas où)
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = '';
+
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- ÉTAPE 2 : Vérifier le code ----------
+async function submitForgotStep2() {
+  const code = document.getElementById('forgotCode').value.trim();
+  const msgEl = document.getElementById('forgotMessage2');
+  const btn = document.getElementById('forgotBtn2');
+
+  if (!code || code.length !== 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Entrez les 6 chiffres du code';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Vérification...';
+
+  try {
+    const res = await fetch(`${API}/auth/verifier-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail, code })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Code validé → passer à l'étape 3
+    forgotVerifiedCode = code;
+    document.getElementById('forgotStep2').style.display = 'none';
+    document.getElementById('forgotStep3').style.display = 'block';
+
+    setTimeout(() => document.getElementById('forgotNewPass').focus(), 100);
+    showToast('✅ Code vérifié !');
+
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- ÉTAPE 3 : Changer le mot de passe ----------
+async function submitForgotStep3() {
+  const nouveau = document.getElementById('forgotNewPass').value;
+  const confirm = document.getElementById('forgotConfirmPass').value;
+  const msgEl = document.getElementById('forgotMessage3');
+  const btn = document.getElementById('forgotBtn3');
+
+  if (!nouveau || !confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Remplissez tous les champs';
+    return;
+  }
+
+  if (nouveau.length < 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Minimum 6 caractères';
+    return;
+  }
+
+  if (nouveau !== confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Les mots de passe ne correspondent pas';
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Modification...';
+
+  try {
+    const res = await fetch(`${API}/auth/reinitialiser-mdp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: forgotEmail,
+        code: forgotVerifiedCode,
+        nouveau_mot_de_passe: nouveau
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+
+    // Succès → afficher l'écran final
+    document.getElementById('forgotStep3').style.display = 'none';
+    document.getElementById('forgotStepSuccess').style.display = 'block';
+
+    showToast('🎉 Mot de passe modifié !');
+  } catch (err) {
+    console.error(err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau';
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- Bouton "Renvoyer le code" ----------
+async function resendForgotCode() {
+  const btn = document.getElementById('resendBtn');
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Envoi...';
+
+  try {
+    const res = await fetch(`${API}/auth/mot-de-passe-oublie`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast('❌ ' + (data.message || 'Erreur'));
+    } else {
+      showToast('📧 Nouveau code envoyé !');
+      document.getElementById('forgotCode').value = '';
+    }
+  } catch (err) {
+    showToast('❌ Erreur réseau');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// ---------- Retour à l'étape 1 ----------
+function backToForgotStep1() {
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotMessage2').textContent = '';
+  document.getElementById('forgotCode').value = '';
+}
+
+
+//-------------------- modifié -------------------------
+    // ==================== CHANGER MOT DE PASSE ====================
+function openPasswordModal() {
+  if (!token || !currentUser) {
+    return openAuth();
+  }
+
+  // Vider les champs
+  document.getElementById('currentPass').value = '';
+  document.getElementById('newPass').value = '';
+  document.getElementById('confirmPass').value = '';
+  document.getElementById('passwordMessage').textContent = '';
+
+  // Ouvrir la modale
+  document.getElementById('passwordModal').classList.add('open');
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.remove('open');
+}
+
+async function submitPasswordChange() {
+  const ancien = document.getElementById('currentPass').value;
+  const nouveau = document.getElementById('newPass').value;
+  const confirm = document.getElementById('confirmPass').value;
+  const msgEl = document.getElementById('passwordMessage');
+
+  // Réinitialiser le message
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  // Validations côté client
+  if (!ancien || !nouveau || !confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Remplissez tous les champs';
+    return;
+  }
+
+  if (nouveau.length < 6) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit contenir au moins 6 caractères';
+    return;
+  }
+
+  if (nouveau !== confirm) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Les deux nouveaux mots de passe ne correspondent pas';
+    return;
+  }
+
+  if (ancien === nouveau) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Le nouveau mot de passe doit être différent de l\'ancien';
+    return;
+  }
+
+  // Envoi au serveur
+  try {
+    const res = await fetch(`${API}/user/changer-mot-de-passe`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        ancien_mot_de_passe: ancien,
+        nouveau_mot_de_passe: nouveau
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      return;
+    }
+
+    // Succès
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = '✅ ' + data.message;
+    showToast('🔐 Mot de passe modifié avec succès');
+
+    // Vider les champs
+    document.getElementById('currentPass').value = '';
+    document.getElementById('newPass').value = '';
+    document.getElementById('confirmPass').value = '';
+
+    // Fermer la modale après 2 secondes
+    setTimeout(() => {
+      closePasswordModal();
+    }, 2000);
+  } catch (err) {
+    console.error('Erreur changement mdp:', err);
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '❌ Erreur réseau. Réessayez.';
+  }
+}
+
+// ------------------ modifié --------------------------
+// ==================== CONTACT ====================
+async function submitContactForm(event) {
+  event.preventDefault();
+
+  const nom = document.getElementById('contactNom').value.trim();
+  const email = document.getElementById('contactEmail').value.trim();
+  const telephone = document.getElementById('contactTel').value.trim();
+  const sujet = document.getElementById('contactSujet').value;
+  const message = document.getElementById('contactMessage').value.trim();
+
+  // Validation
+  if (!nom || !email || !sujet || !message) {
+    return showToast('⚠️ Remplissez tous les champs obligatoires (*)');
+  }
+
+  // Validation email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return showToast('⚠️ Adresse email invalide');
+  }
+
+  // Désactiver le bouton pendant l'envoi
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '⏳ Envoi en cours...';
+
+  try {
+    const res = await fetch(`${API}/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nom, email, telephone, sujet, message })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+      return showToast('❌ ' + (data.message || 'Erreur'));
+    }
+
+    // Succès
+    showToast('✅ Message envoyé ! Nous vous répondrons sous 48h.');
+
+    // Réinitialiser le formulaire
+    document.getElementById('contactForm').reset();
+
+    // Message de confirmation visuel
+    const formBox = document.querySelector('.contact-form-box');
+    if (formBox) {
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = `
+        background: #0a8754;
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 20px;
+        text-align: center;
+        font-size: 15px;
+      `;
+      successDiv.innerHTML = `
+        <div style="font-size: 40px;margin-bottom: 10px;">✅</div>
+        <strong>Message envoyé avec succès !</strong>
+        <p style="margin-top: 8px;font-size: 14px;opacity: 0.95;">
+          Nous vous répondrons sous <strong>48 heures ouvrées</strong> à l'adresse <strong>${email}</strong>.
+        </p>
+      `;
+      formBox.appendChild(successDiv);
+
+      // Faire disparaître le message après 10 secondes
+      setTimeout(() => {
+        successDiv.style.transition = 'opacity 0.5s';
+        successDiv.style.opacity = '0';
+        setTimeout(() => successDiv.remove(), 500);
+      }, 10000);
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  } catch (err) {
+    console.error('Erreur contact:', err);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+    showToast('❌ Erreur réseau. Vérifiez votre connexion.');
+  }
+}
+
+//---------------- modifié -------------------------
+// ==================== PAGE COMPTE SUSPENDU ====================
+function afficherPageSuspendu(motif, dateBlocage) {
+  // Remplir le motif
+  const motifEl = document.getElementById('pageSuspenduMotif');
+  if (motifEl) motifEl.textContent = motif || 'Non précisé';
+
+  // Date et durée
+  const dateLineEl = document.getElementById('pageSuspenduDateLine');
+  const dateEl = document.getElementById('pageSuspenduDate');
+  const dureeLineEl = document.getElementById('pageSuspenduDureeLine');
+  const dureeEl = document.getElementById('pageSuspenduDuree');
+
+  if (dateBlocage && dateEl && dateLineEl) {
+    const dateStr = new Date(dateBlocage).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    dateEl.textContent = dateStr;
+    dateLineEl.style.display = 'flex';
+
+    // Calcul de la durée
+    if (dureeEl && dureeLineEl) {
+      const ms = Date.now() - new Date(dateBlocage).getTime();
+      const heures = Math.floor(ms / (1000 * 60 * 60));
+      const jours = Math.floor(heures / 24);
+      let dureeTxt = '';
+      if (jours > 0) dureeTxt = `${jours} jour${jours > 1 ? 's' : ''}`;
+      else if (heures > 0) dureeTxt = `${heures} heure${heures > 1 ? 's' : ''}`;
+      else dureeTxt = 'moins d\'une heure';
+
+      dureeEl.textContent = dureeTxt;
+      dureeLineEl.style.display = 'flex';
+    }
+  } else {
+    if (dateLineEl) dateLineEl.style.display = 'none';
+    if (dureeLineEl) dureeLineEl.style.display = 'none';
+  }
+
+  // Boutons de contact
+  const callEl = document.getElementById('pageSuspenduCall');
+  const callNumEl = document.getElementById('pageSuspenduCallNum');
+  if (callEl) callEl.href = 'tel:' + CONTACT_SUPPORT.telephoneRaw;
+  if (callNumEl) callNumEl.textContent = CONTACT_SUPPORT.telephone;
+
+  const emailEl = document.getElementById('pageSuspenduEmail');
+  const emailAddrEl = document.getElementById('pageSuspenduEmailAddr');
+  if (emailEl) {
+    const sujet = encodeURIComponent('Contestation de suspension de compte');
+    const corps = encodeURIComponent(
+      `Bonjour,\n\nMon compte NigerShop a été suspendu.\n\n` +
+      `Motif indiqué : ${motif || 'Non précisé'}\n\n` +
+      `Je souhaite contester cette décision ou obtenir plus d'informations.\n\n` +
+      `Cordialement.`
+    );
+    emailEl.href = `mailto:${CONTACT_SUPPORT.email}?subject=${sujet}&body=${corps}`;
+  }
+  if (emailAddrEl) emailAddrEl.textContent = CONTACT_SUPPORT.email;
+
+  const waEl = document.getElementById('pageSuspenduWhatsApp');
+  if (waEl) {
+    const msg = encodeURIComponent(
+      `Bonjour, mon compte NigerShop a été suspendu. Motif : ${motif || 'Non précisé'}. Je souhaite en savoir plus.`
+    );
+    waEl.href = `https://wa.me/${CONTACT_SUPPORT.whatsapp}?text=${msg}`;
+  }
+
+  // Mettre à jour l'URL (permet de partager la page)
+  try {
+    window.history.pushState({ page: 'suspendu' }, '', '#compte-suspendu');
+  } catch (e) {}
+
+  // Afficher la page
+  showPage('suspendu');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Lien depuis la modale vers la page complète
+function voirPageSuspendu() {
+  const motif = document.getElementById('bannedMotif')?.textContent || '';
+  const dateStr = document.getElementById('bannedDate')?.textContent || '';
+  const dateLine = document.getElementById('bannedDateLine');
+  const date = (dateLine && dateLine.style.display !== 'none') ? dateStr : null;
+
+  // Fermer la modale
+  const modal = document.getElementById('bannedModal');
+  if (modal) modal.classList.remove('open');
+
+  afficherPageSuspendu(motif, date);
+}
+// --------------  modifié -------------------------
+
+// ==================== NAVIGATION ====================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (name === 'panier') renderCart();
+  if (name === 'favoris') loadFavoris();
+  if (name === 'historique') loadHistorique();
+  if (name === 'commandes') loadMesCommandes();
+  if (name === 'messages') loadMessages();
+}
+
+// ==================== PRODUITS ====================
+async function loadProduits() {
+  try {
+    const res = await fetch(`${API}/produits`);
+    produits = await res.json();
+    renderProducts(produits, 'homeProducts', 4);
+    renderProducts(produits, 'catalogueProducts');
+  } catch (e) { showToast('⚠️ Serveur inaccessible'); }
+}
+
+function renderProducts(list, targetId, limit) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  const items = limit ? list.slice(0, limit) : list;
+  if (!items.length) {
+    el.innerHTML = '<p style="color:#666;">Aucun produit.</p>';
+    return;
+  }
+  el.innerHTML = items.map(p => {
+    const img = p.images?.[0] || null;
+    const stars = '★'.repeat(Math.round(p.note_moyenne || 0)) +
+                  '☆'.repeat(5 - Math.round(p.note_moyenne || 0));
+    return `
+<div class="product-card">
+  <div class="product-image" onclick="openProduit(${p.id})" style="cursor:pointer;">
+    ${img ? `<img src="${img}" alt="${p.nom}">` : '📦'}
+    ${p.ancien_prix && p.ancien_prix > p.prix
+      ? `<span class="promo-badge">-${Math.round((1 - p.prix / p.ancien_prix) * 100)}%</span>`
+      : ''}
+    <button class="fav-btn" onclick="event.stopPropagation();toggleFavori(${p.id},this)">❤️</button>
+  </div>
+  <div class="product-body">
+    <span class="product-cat">${p.categorie || 'Divers'}</span>
+    <h3 class="product-name">${p.nom}</h3>
+    <div class="stars">${stars} (${p.nb_avis || 0})</div>
+    <p class="product-desc">${(p.description || '').slice(0, 70)}</p>
+    <div class="product-price">
+      ${formatPrice(p.prix)}
+      ${p.ancien_prix && p.ancien_prix > p.prix
+        ? `<span class="old-price">${formatPrice(p.ancien_prix)}</span>`
+        : ''}
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-primary" onclick="addToCart(${p.id})" style="flex:1;">🛒 Ajouter</button>
+      <button class="btn-secondary" onclick="partagerProduit(${p.id})" style="margin-top:0;padding:10px 14px;" title="Partager">📤</button>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+function formatPrice(n) {
+  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA';
+}
+
+// ==================== DETAIL PRODUIT ====================
+async function openProduit(id) {
+  showPage('produit');
+  const res = await fetch(`${API}/produits/${id}`);
+  const p = await res.json();
+  currentSliderIndex = 0;
+  currentSliderImages = p.images || [];
+
+  if (token) {
+    fetch(`${API}/historique`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ produit_id: id, action: 'vue' })
+    }).catch(() => {});
+  }
+
+  const stars = '★'.repeat(Math.round(p.note_moyenne || 0)) +
+                '☆'.repeat(5 - Math.round(p.note_moyenne || 0));
+
+  document.getElementById('produitDetail').innerHTML = `
+    <button class="btn-secondary btn-sm" onclick="showPage('catalogue')" style="margin-top:20px;">← Retour</button>
+    <div class="detail-grid">
+      <div>
+        <div class="slider">
+          ${p.images.length
+            ? `<img id="sliderImg" src="${p.images[0]}">`
+            : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:100px;">📦</div>`}
+          ${p.images.length > 1 ? `
+            <div class="slider-nav">
+              <button onclick="sliderPrev()">‹</button>
+              <button onclick="sliderNext()">›</button>
+            </div>
+            <div class="slider-dots">
+              ${p.images.map((_, i) => `<span class="${i===0?'active':''}" onclick="sliderGo(${i})"></span>`).join('')}
+            </div>` : ''}
+        </div>
+      </div>
+      <div class="detail-info">
+        <span class="product-cat">${p.categorie}</span>
+        <h1>${p.nom}</h1>
+        <div class="stars" style="font-size:18px;">${stars} ${p.note_moyenne?.toFixed(1) || 0}/5 (${p.nb_avis || 0} avis)</div>
+        <div class="detail-price">
+          ${formatPrice(p.prix)}
+          ${p.ancien_prix && p.ancien_prix > p.prix
+            ? `<span class="old-price">${formatPrice(p.ancien_prix)}</span>`
+            : ''}
+        </div>
+        <p style="color:#666;margin-bottom:15px;">${p.description || ''}</p>
+        <p style="color:${p.stock > 0 ? '#0a8754' : '#d32f2f'};font-weight:600;">
+          ${p.stock > 0 ? `✅ En stock (${p.stock})` : '❌ Rupture de stock'}
+        </p>
+        <div class="detail-actions">
+          <button class="btn-primary" onclick="addToCart(${p.id})">🛒 Ajouter au panier</button>
+          <button class="btn-secondary" onclick="toggleFavori(${p.id},this)">❤️ Favoris</button>
+          <button class="btn-secondary" onclick="contactVendeur(${p.vendeur_id}, ${p.id})">💬 Contacter</button>
+          <button class="btn-secondary" onclick="partagerProduit(${p.id})">📤 Partager</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(event,'avis')">⭐ Avis (${p.commentaires.length})</div>
+      <div class="tab" onclick="switchTab(event,'desc')">📝 Description</div>
+    </div>
+    <div class="tab-content" id="tab-avis">
+      <div id="avisForm" style="margin-bottom:20px;">
+        <h4>Laisser un avis</h4>
+        <select id="avisNote" class="search-input" style="width:100%;margin:8px 0;border-radius:8px;padding:10px;">
+          <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+          <option value="4">⭐⭐⭐⭐ Très bien</option>
+          <option value="3">⭐⭐⭐ Bien</option>
+          <option value="2">⭐⭐ Moyen</option>
+          <option value="1">⭐ Mauvais</option>
+        </select>
+        <textarea id="avisTexte" placeholder="Votre avis..." style="width:100%;padding:10px;border:1px solid #e0e0e0;border-radius:8px;min-height:80px;"></textarea>
+        <button class="btn-primary btn-sm" onclick="submitAvis(${p.id})" style="margin-top:8px;">Publier</button>
+      </div>
+      ${p.commentaires.map(c => `
+        <div class="comment">
+          <div class="comment-header">
+            <strong>${c.user_nom}</strong>
+            <span class="stars">${'★'.repeat(c.note)}${'☆'.repeat(5-c.note)}</span>
+          </div>
+          <p>${c.texte}</p>
+          <small style="color:#999;">${new Date(c.created_at).toLocaleDateString('fr-FR')}</small>
+        </div>
+      `).join('') || '<p style="color:#666;">Aucun avis pour le moment.</p>'}
+    </div>
+    <div class="tab-content" id="tab-desc" style="display:none;">
+      <p>${p.description || 'Pas de description.'}</p>
+    </div>
+  `;
+}
+
+function sliderGo(i) {
+  currentSliderIndex = i;
+  document.getElementById('sliderImg').src = currentSliderImages[i];
+  document.querySelectorAll('.slider-dots span').forEach((s, idx) =>
+    s.classList.toggle('active', idx === i));
+}
+function sliderNext() { sliderGo((currentSliderIndex + 1) % currentSliderImages.length); }
+function sliderPrev() { sliderGo((currentSliderIndex - 1 + currentSliderImages.length) % currentSliderImages.length); }
+
+function switchTab(e, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById('tab-avis').style.display = tab === 'avis' ? 'block' : 'none';
+  document.getElementById('tab-desc').style.display = tab === 'desc' ? 'block' : 'none';
+}
+
+async function submitAvis(pid) {
+  if (!token) return openAuth();
+  const note = parseInt(document.getElementById('avisNote').value);
+  const texte = document.getElementById('avisTexte').value.trim();
+  if (!texte) return showToast('⚠️ Écrire un avis');
+  const res = await fetch(`${API}/produits/${pid}/commentaires`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ note, texte })
+  });
+  if (res.ok) { showToast('✅ Avis publié'); openProduit(pid); }
+  else if (res.status !== 403) showToast('❌ Erreur');
+}
+
+// ==================== FAVORIS ====================
+async function toggleFavori(pid, btn) {
+  if (!token) return openAuth();
+  const isFav = btn?.classList.contains('active');
+  const res = await fetch(`${API}/favoris/${pid}`, {
+    method: isFav ? 'DELETE' : 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (res.ok) {
+    if (btn) btn.classList.toggle('active');
+    showToast(isFav ? '💔 Retiré des favoris' : '❤️ Ajouté aux favoris');
+  }
+}
+
+async function loadFavoris() {
+  if (!token) return openAuth();
+  const res = await fetch(`${API}/favoris`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
+  const list = await res.json();
+  renderProducts(list, 'favorisList');
+}
+
+// ==================== HISTORIQUE ====================
+async function loadHistorique() {
+  if (!token) return openAuth();
+  const res = await fetch(`${API}/historique`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
+  const list = await res.json();
+  document.getElementById('historiqueList').innerHTML = list.length ? list.map(h => `
+    <div class="admin-list-item">
+      <span><strong>${h.produit_nom || 'Produit #' + h.produit_id}</strong> — ${h.action}</span>
+      <small style="color:#999;">${new Date(h.created_at).toLocaleString('fr-FR')}</small>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucune activité.</p>';
+}
+
+// ==================== COMMANDES CLIENT ====================
+async function loadMesCommandes() {
+  if (!token) return openAuth();
+  const res = await fetch(`${API}/commandes`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
+  const list = await res.json();
+  document.getElementById('mesCommandes').innerHTML = list.length ? list.map(c => `
+    <div class="admin-list-item">
+      <div>
+        <strong>Commande #${c.id}</strong> — ${formatPrice(c.total)}<br>
+        <small>${c.ville_livraison} · ${c.transport} · ${c.paiement}</small><br>
+        <small style="color:#999;">${new Date(c.created_at).toLocaleString('fr-FR')}</small>
+      </div>
+      <span style="background:#ff6b00;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;">${c.statut}</span>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucune commande.</p>';
+}
+
+// ==================== MESSAGES ====================
+async function contactVendeur(vendeurId, produitId) {
+  if (!token) return openAuth();
+  currentChatUser = vendeurId;
+  showPage('messages');
+  openChat(vendeurId);
+}
+
+async function loadMessages() {
+  if (!token) return openAuth();
+  const chatView = document.getElementById('chatView');
+  if (chatView) chatView.style.display = 'none';
+  const res = await fetch(`${API}/messages`, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
+  const list = await res.json();
+  const byUser = {};
+  list.forEach(m => {
+    const other = m.expediteur_id === currentUser.id ? m.destinataire_id : m.expediteur_id;
+    const nom = m.expediteur_id === currentUser.id ? m.dest_nom : m.exp_nom;
+    if (!byUser[other]) byUser[other] = { id: other, nom, last: m };
+  });
+  const arr = Object.values(byUser);
+  document.getElementById('messagesList').innerHTML = arr.length ? arr.map(u => `
+    <div class="admin-list-item" onclick="openChat(${u.id})" style="cursor:pointer;">
+      <div><strong>${u.nom}</strong><br>
+        <small style="color:#666;">${u.last.contenu.slice(0, 50)}...</small></div>
+      <small style="color:#999;">${new Date(u.last.created_at).toLocaleDateString('fr-FR')}</small>
+    </div>
+  `).join('') : '<p style="color:#666;">Aucune conversation.</p>';
+}
+
+async function openChat(userId) {
+  currentChatUser = userId;
+  document.getElementById('messagesList').style.display = 'none';
+  document.getElementById('chatView').style.display = 'block';
+  document.getElementById('chatHeader').textContent = `Conversation #${userId}`;
+  const res = await fetch(`${API}/messages/${userId}`,
+    { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return;
+  const list = await res.json();
+  document.getElementById('chatMessages').innerHTML = list.map(m => `
+    <div class="chat-msg ${m.expediteur_id === currentUser.id ? 'me' : 'other'}">${m.contenu}</div>
+  `).join('');
+  const cm = document.getElementById('chatMessages');
+  cm.scrollTop = cm.scrollHeight;
+}
+
+async function sendMessage() {
+  const contenu = document.getElementById('chatInput').value.trim();
+  if (!contenu || !currentChatUser) return;
+  await fetch(`${API}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ destinataire_id: currentChatUser, contenu })
+  });
+  document.getElementById('chatInput').value = '';
+  openChat(currentChatUser);
+}
+
+function showContactEmail() {
+  document.getElementById('contactEmailModal').classList.add('open');
+}
+function closeContactEmail() {
+  document.getElementById('contactEmailModal').classList.remove('open');
+}
+async function submitContactEmail() {
+  const sujet = document.getElementById('emailSujet').value.trim();
+  const message = document.getElementById('emailMessage').value.trim();
+  if (!sujet || !message) return showToast('⚠️ Remplir tous les champs');
+  const res = await fetch(`${API}/contact-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ destinataire_id: currentChatUser, sujet, message })
+  });
+  if (res.ok) { showToast('✅ Email envoyé'); closeContactEmail(); }
+  else if (res.status !== 403) showToast('❌ Erreur');
+}
+
+// ==================== PANIER ====================
+function addToCart(id) {
+  const p = produits.find(x => x.id === id);
+  if (!p) return;
+  const ex = panier.find(x => x.id === id);
+  if (ex) ex.qty++;
+  else panier.push({ id: p.id, nom: p.nom, prix: p.prix, image: p.images?.[0], qty: 1 });
+  savePanier();
+  showToast(`✅ ${p.nom} ajouté`);
+}
+
+function removeFromCart(id) {
+  panier = panier.filter(x => x.id !== id);
+  savePanier(); renderCart();
+}
+
+function changeQty(id, delta) {
+  const item = panier.find(x => x.id === id);
+  if (!item) return;
+  item.qty += delta;
+  if (item.qty <= 0) return removeFromCart(id);
+  savePanier(); renderCart();
+}
+
+function savePanier() {
+  localStorage.setItem('panier', JSON.stringify(panier));
+  const cc = document.getElementById('cartCount');
+  if (cc) cc.textContent = panier.reduce((s, i) => s + i.qty, 0);
+}
+
+function renderCart() {
+  const el = document.getElementById('cartItems');
+  const summary = document.getElementById('cartSummary');
+  if (!el || !summary) return;
+  if (!panier.length) {
+    el.innerHTML = '<p style="text-align:center;color:#666;padding:30px;">Votre panier est vide 😔</p>';
+    summary.style.display = 'none';
+    promoAppliquee = null;
+    return;
+  }
+  el.innerHTML = panier.map(i => `
+    <div class="cart-item">
+      <div class="cart-item-img">${i.image ? `<img src="${i.image}">` : '📦'}</div>
+      <div class="cart-item-info">
+        <h4>${i.nom}</h4>
+        <p style="color:#ff6b00;font-weight:600;">${formatPrice(i.prix)} × ${i.qty}</p>
+      </div>
+      <div class="qty-ctrl">
+        <button onclick="changeQty(${i.id},-1)">−</button>
+        <span>${i.qty}</span>
+        <button onclick="changeQty(${i.id},1)">+</button>
+      </div>
+      <button class="remove-btn" onclick="removeFromCart(${i.id})">🗑️</button>
+    </div>
+  `).join('');
+
+  const sousTotal = panier.reduce((s, i) => s + i.prix * i.qty, 0);
+
+  let remise = 0;
+  if (promoAppliquee) {
+    if (promoAppliquee.type === 'pourcent') remise = Math.round(sousTotal * promoAppliquee.valeur / 100);
+    else remise = Math.min(promoAppliquee.valeur, sousTotal);
+    promoAppliquee.remise = remise;
+  }
+  const totalFinal = sousTotal - remise;
+
+  document.getElementById('cartTotal').textContent = formatPrice(totalFinal);
+
+  const originalLine = document.getElementById('totalOriginal');
+  const remiseLine = document.getElementById('remiseLine');
+  if (promoAppliquee) {
+    originalLine.style.display = 'block';
+    remiseLine.style.display = 'block';
+    document.getElementById('cartSousTotal').textContent = formatPrice(sousTotal);
+    document.getElementById('cartRemise').textContent = '-' + formatPrice(remise);
+  } else {
+    originalLine.style.display = 'none';
+    remiseLine.style.display = 'none';
+  }
+
+  summary.style.display = 'block';
+}
+
+// ==================== PROMO ====================
+async function appliquerPromo() {
+  if (!token) return openAuth();
+  const code = document.getElementById('promoInput').value.trim().toUpperCase();
+  const msgEl = document.getElementById('promoMessage');
+
+  if (!code) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Saisis un code';
+    return;
+  }
+
+  const sousTotal = panier.reduce((s, i) => s + i.prix * i.qty, 0);
+
+  try {
+    const res = await fetch(`${API}/promo/verifier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ code, total: sousTotal })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 403) return;
+      promoAppliquee = null;
+      msgEl.style.color = '#d32f2f';
+      msgEl.textContent = '❌ ' + data.message;
+      renderCart();
+      return;
+    }
+
+    promoAppliquee = { code: data.code, type: data.type, valeur: data.valeur, remise: data.remise };
+    msgEl.style.color = '#0a8754';
+    msgEl.textContent = `✅ Code "${data.code}" appliqué : -${formatPrice(data.remise)}`;
+    renderCart();
+    showToast(`🎟️ Remise de ${formatPrice(data.remise)} !`);
+  } catch (e) {
+    msgEl.style.color = '#d32f2f';
+    msgEl.textContent = '⚠️ Erreur serveur';
+  }
+}
+
+// ==================== AUTH ====================
+function openAuth(role) {
+  if (token && currentUser) {
+    if (confirm(`Connecté : ${currentUser.nom}. Voulez-vous vous déconnecter ?`)) logout();
+    return;
+  }
+  document.getElementById('authModal').classList.add('open');
+  if (role === 'vendeur') {
+    authMode = 'register'; updateAuthForm();
+    document.getElementById('authRole').value = 'vendeur';
+  }
+}
+function closeAuth() { document.getElementById('authModal').classList.remove('open'); }
+function toggleAuthMode(e) {
+  e.preventDefault();
+  authMode = authMode === 'login' ? 'register' : 'login';
+  updateAuthForm();
+}
+
+//-------------------- modifié --------------------------------
+function updateAuthForm() {
+  const isReg = authMode === 'register';
+
+  // Titre et bouton principal
+  document.getElementById('authTitle').textContent = isReg ? 'Créer un compte' : 'Connexion';
+  document.getElementById('authSubmit').textContent = isReg ? "✨ S'inscrire" : '🔑 Se connecter';
+
+     // Champs supplémentaires visibles uniquement en inscription
+  ['authNom','authTel','authVille','authRole','authCodeParrain'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isReg ? 'block' : 'none';
+  });
+
+  // Champ "Confirmer le mot de passe" (dans un wrapper)
+  const confirmWrapper = document.getElementById('authPassConfirmWrapper');
+  if (confirmWrapper) {
+    confirmWrapper.style.display = isReg ? 'block' : 'none';
+  }
+
+  // Texte sous le formulaire + lien bascule
+  const switchTextEl = document.getElementById('authSwitchText');
+  const switchLinkEl = document.getElementById('authSwitchLink');
+
+  if (switchTextEl) {
+    switchTextEl.textContent = isReg ? 'Déjà un compte ?' : 'Pas de compte ?';
+  }
+  if (switchLinkEl) {
+    switchLinkEl.textContent = isReg ? 'Se connecter' : "S'inscrire";
+  }
+
+  // Afficher/Masquer le lien "Mot de passe oublié ?"
+  const forgotLinkEl = document.getElementById('forgotPasswordLink');
+  if (forgotLinkEl) {
+    forgotLinkEl.style.display = isReg ? 'none' : 'block';
+  }
+}
+//------------------- modifié ---------------------------------
+
+async function submitAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const mot_de_passe = document.getElementById('authPass').value;
+  if (!email || !mot_de_passe) return showToast('⚠️ Champs requis');
+  if (authMode === 'login') {
+    const res = await fetch(`${API}/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, mot_de_passe })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      // Cas spécial : compte banni
+      if (res.status === 403 && data.banni) {
+        gererBannissement(data);
+        return;
+      }
+      return showToast('❌ ' + data.message);
+    }
+    token = data.token; currentUser = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    showToast(`👋 Bienvenue ${currentUser.nom}`);
+    updateAuthBtn(); closeAuth();
+  }   else {
+    // ===== INSCRIPTION =====
+    const nom = document.getElementById('authNom').value.trim();
+    const telephone = document.getElementById('authTel').value.trim();
+    const ville = document.getElementById('authVille').value.trim();
+    const role = document.getElementById('authRole').value;
+    const codeParrain = document.getElementById('authCodeParrain').value.trim();
+    const motDePasseConfirm = document.getElementById('authPassConfirm').value;
+
+    // Validations
+    if (!nom) {
+      return showToast('⚠️ Nom requis');
+    }
+
+    if (mot_de_passe.length < 6) {
+      return showToast('⚠️ Le mot de passe doit contenir au moins 6 caractères');
+    }
+
+    if (!motDePasseConfirm) {
+      return showToast('⚠️ Confirmez votre mot de passe');
+    }
+
+    if (mot_de_passe !== motDePasseConfirm) {
+      return showToast('❌ Les deux mots de passe ne correspondent pas');
+    }
+
+    // Payload à envoyer
+    const payload = {
+      nom,
+      email,
+      mot_de_passe,
+      telephone,
+      ville,
+      role,
+      code_parrain_utilise: codeParrain
+    };
+
+    const res = await fetch(`${API}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast('❌ ' + data.message);
+
+    showToast(`✅ Compte créé ! Code parrain : ${data.code_parrain}`);
+
+    // Vider les champs
+    document.getElementById('authNom').value = '';
+    document.getElementById('authTel').value = '';
+    document.getElementById('authVille').value = '';
+    document.getElementById('authPass').value = '';
+    document.getElementById('authPassConfirm').value = '';
+    document.getElementById('authCodeParrain').value = '';
+
+    // Basculer en mode connexion
+    authMode = 'login';
+    updateAuthForm();
+  }};
+
+// ⚠️ ATTENTION : "function" (pas "ffunction")
+function updateAuthBtn() {
+  const btn = document.getElementById('authBtn');
+  const navMsg = document.getElementById('navMessages');
+  const navCmd = document.getElementById('navCommandes');
+  const mobMsg = document.getElementById('mobNavMessages');
+  const mobCmd = document.getElementById('mobNavCommandes');
+
+  if (!btn) return;
+
+  if (token && currentUser) {
+    btn.textContent = `👤 ${currentUser.nom.split(' ')[0]} ▾`;
+
+    if (navMsg) navMsg.style.display = 'inline';
+    if (navCmd) navCmd.style.display = 'inline';
+    if (mobMsg) mobMsg.style.display = 'block';
+    if (mobCmd) mobCmd.style.display = 'block';
+
+    const adminLink = document.getElementById('adminLink');
+    if (adminLink) {
+      adminLink.style.display = (currentUser.role === 'admin') ? 'block' : 'none';
+    }
+
+    const header = document.getElementById('userDropdownHeader');
+    if (header) {
+      header.innerHTML = `
+        <strong>👤 ${currentUser.nom}</strong>
+        <small>${currentUser.email}</small>
+      `;
+    }
+
+    const codeEl = document.getElementById('monCodeParrain');
+    if (codeEl && currentUser.code_parrain) {
+      codeEl.innerHTML = `
+        <div style="background:#f5f5f5;padding:15px;border-radius:8px;">
+          <strong>Votre code parrain :</strong>
+          <span style="color:#ff6b00;font-size:1.3rem;font-weight:700;margin-left:10px;">${currentUser.code_parrain}</span>
+          <button class="btn-primary btn-sm" style="margin-left:10px;" onclick="copyCode('${currentUser.code_parrain}')">📋 Copier</button>
+        </div>`;
+    }
+  } else {
+    btn.textContent = '👤 Connexion';
+
+    if (navMsg) navMsg.style.display = 'none';
+    if (navCmd) navCmd.style.display = 'none';
+    if (mobMsg) mobMsg.style.display = 'none';
+    if (mobCmd) mobCmd.style.display = 'none';
+  }
+}
+
+// ==================== MENU UTILISATEUR ====================
+function handleAuthBtn() {
+  if (token && currentUser) {
+    toggleUserMenu();
+  } else {
+    openAuth();
+  }
+}
+
+function toggleUserMenu() {
+  const dd = document.getElementById('userDropdown');
+  if (!dd) return;
+  dd.style.display = (dd.style.display === 'none' || dd.style.display === '') ? 'block' : 'none';
+}
+
+function closeUserMenu() {
+  const dd = document.getElementById('userDropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('userMenuContainer');
+  if (container && !container.contains(e.target)) {
+    closeUserMenu();
+  }
+});
+
+// ==================== MENU MOBILE ====================
+function toggleMobileMenu() {
+  const mm = document.getElementById('mobileMenu');
+  if (mm) mm.classList.toggle('open');
+}
+
+function closeMobileMenu(e) {
+  const mm = document.getElementById('mobileMenu');
+  if (!mm) return;
+  if (!e || e.target.id === 'mobileMenu' || (e.target.classList && e.target.classList.contains('mobile-menu-close'))) {
+    mm.classList.remove('open');
+  }
+}
+
+function copyCode(c) {
+  navigator.clipboard.writeText(c);
+  showToast('📋 Code copié !');
+}
+
+function logout() {
+  token = null; currentUser = null;
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  updateAuthBtn(); showToast('Déconnecté'); showPage('home');
+}
+
+// ==================== CHECKOUT ====================
+function openCheckout() {
+  if (!token) return openAuth();
+  if (!panier.length) return showToast('⚠️ Panier vide');
+  document.getElementById('checkoutModal').classList.add('open');
+  suggestTransport();
+}
+function closeCheckout() { document.getElementById('checkoutModal').classList.remove('open'); }
+
+const transportsParVille = {
+  'Niamey': 'SONEF', 'Maradi': 'RIMBO', 'Zinder': 'RIMBO',
+  'Tahoua': 'STM', 'Agadez': 'SONITRAV', 'Dosso': 'NIZAR',
+  'Tillabéri': 'NIZAR', 'Diffa': 'AMANA'
+};
+function suggestTransport() {
+  const v = document.getElementById('checkVille').value;
+  const s = transportsParVille[v];
+  if (s) {
+    document.getElementById('checkTransport').value = s;
+    document.getElementById('transportSuggestion').textContent = `💡 Recommandé : ${s}`;
+  }
+}
+document.getElementById('checkVille').addEventListener('change', suggestTransport);
+
+async function submitCommande() {
+  const ville_livraison = document.getElementById('checkVille').value;
+  const telephone = document.getElementById('checkTel').value.trim();
+  const transport = document.getElementById('checkTransport').value;
+  const paiement = document.getElementById('checkPaiement').value;
+  if (!telephone) return showToast('⚠️ Téléphone requis');
+
+  const sousTotal = panier.reduce((s, i) => s + i.prix * i.qty, 0);
+  const remise = promoAppliquee ? promoAppliquee.remise : 0;
+  const total = sousTotal - remise;
+
+  const res = await fetch(`${API}/commandes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({
+      total, transport, paiement, ville_livraison, telephone,
+      code_promo: promoAppliquee ? promoAppliquee.code : null,
+      articles: panier.map(i => ({ id: i.id, nom: i.nom, qty: i.qty, prix: i.prix }))
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 403) return;
+    return showToast('❌ ' + data.message);
+  }
+
+  showToast('✅ Commande confirmée ! Email envoyé.');
+  panier = [];
+  promoAppliquee = null;
+  savePanier();
+  closeCheckout();
+  renderCart();
+  const msgEl = document.getElementById('promoMessage');
+  if (msgEl) msgEl.textContent = '';
+  const inpEl = document.getElementById('promoInput');
+  if (inpEl) inpEl.value = '';
+  showPage('home');
+}
+
+// ==================== FILTRES ====================
+function applyFilters() {
+  const cat = document.getElementById('filterCategorie').value;
+  const min = parseFloat(document.getElementById('filterPrixMin').value) || 0;
+  const max = parseFloat(document.getElementById('filterPrixMax').value) || Infinity;
+  const tri = document.getElementById('filterTri').value;
+  let f = produits.filter(p =>
+    (cat === 'tous' || p.categorie === cat) && p.prix >= min && p.prix <= max);
+  if (tri === 'asc') f.sort((a,b) => a.prix - b.prix);
+  else if (tri === 'desc') f.sort((a,b) => b.prix - a.prix);
+  else if (tri === 'nom') f.sort((a,b) => a.nom.localeCompare(b.nom));
+  renderProducts(f, 'catalogueProducts');
+  showToast(`🔎 ${f.length} produit(s)`);
+}
+function resetFilters() {
+  document.getElementById('filterCategorie').value = 'tous';
+  document.getElementById('filterPrixMin').value = '';
+  document.getElementById('filterPrixMax').value = '';
+  document.getElementById('filterTri').value = 'default';
+  renderProducts(produits, 'catalogueProducts');
+}
+document.getElementById('searchInput').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase().trim();
+  const f = produits.filter(p =>
+    p.nom.toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
+  showPage('catalogue');
+  renderProducts(f, 'catalogueProducts');
+});
+// -------------------- modifié --------------------------
+// ==================== AFFICHER/MASQUER MOT DE PASSE ====================
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.title = 'Masquer le mot de passe';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+    btn.title = 'Afficher le mot de passe';
+  }
+}
+// -------------------- modifié --------------------------
+// ==================== UTILS ====================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._t);
+  window._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+function contactWhatsApp() {
+  window.open('https://wa.me/22788893490?text=Bonjour, je souhaite devenir partenaire.', '_blank');
+}
+
+// ==================== DARK MODE ====================
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  const btn = document.getElementById('themeBtn');
+  if (theme === 'dark') {
+    document.body.classList.add('dark');
+    if (btn) btn.textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark');
+    if (btn) btn.textContent = '🌙';
+  }
+  localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+}
+
+// ==================== PARTAGE PRODUIT ====================
+function partagerProduit(produitId) {
+  const p = produits.find(x => x.id === produitId);
+  if (!p) return;
+
+  const url = window.location.origin + '/#produit-' + p.id;
+  const prix = formatPrice(p.prix);
+  const promo = (p.ancien_prix && p.ancien_prix > p.prix)
+    ? ` (au lieu de ${formatPrice(p.ancien_prix)} 🔥)`
+    : '';
+
+  const texte =
+    `🛍️ *${p.nom}*\n\n` +
+    `💰 Prix : ${prix}${promo}\n` +
+    `📂 Catégorie : ${p.categorie || 'Divers'}\n\n` +
+    `${(p.description || '').slice(0, 100)}...\n\n` +
+    `👉 Voir sur NigerShop : ${url}`;
+
+  if (navigator.share) {
+    navigator.share({
+      title: p.nom,
+      text: texte,
+      url: url
+    }).catch(() => {});
+  } else {
+    const waUrl = 'https://wa.me/?text=' + encodeURIComponent(texte);
+    window.open(waUrl, '_blank');
+  }
+
+  if (token) {
+    fetch(`${API}/historique`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ produit_id: p.id, action: 'partage' })
+    }).catch(() => {});
+  }
+}
+
+function copierLienProduit(produitId) {
+  const url = window.location.origin + '/#produit-' + produitId;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('📋 Lien copié !');
+  }).catch(() => {
+    showToast('❌ Impossible de copier');
+  });
+}
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  loadProduits();
+  savePanier();
+  updateAuthBtn();
+  initTheme();
+
+  // Récupérer le hash UNE SEULE FOIS
+  const hash = window.location.hash;
+
+  // Ouverture directe d'un produit
+  if (hash && hash.startsWith('#produit-')) {
+    const pid = hash.replace('#produit-', '');
+    setTimeout(() => openProduit(pid), 500);
+  }
+
+  // Date de mise à jour légale
+  const legalDateEl = document.getElementById('legalDate');
+  if (legalDateEl) {
+    legalDateEl.textContent = new Date().toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+  }
+});
+
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash;
+  if (hash && hash.startsWith('#produit-')) {
+    const pid = hash.replace('#produit-', '');
+    openProduit(pid);
+  }
+  if (hash && hash.startsWith('#reset-password')) {
+    afficherPageResetPassword();
+  }
+});
