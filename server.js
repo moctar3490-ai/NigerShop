@@ -1,6 +1,6 @@
 // ============================================================
-// NigerShop — Backend Node.js + SQLite/Turso (version corrigée finale)
-// Dépendances : npm install express@4 @libsql/client @libsql/linux-x64-gnu bcryptjs jsonwebtoken multer nodemailer cors dotenv
+// NigerShop — Backend Node.js + Turso + Cloudinary
+// Dépendances : npm install express@4 @libsql/client @libsql/linux-x64-gnu cloudinary multer-storage-cloudinary bcryptjs jsonwebtoken multer nodemailer cors dotenv
 // ============================================================
 
 require('dotenv').config();
@@ -14,6 +14,8 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@libsql/client');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,26 +37,30 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Dossier uploads
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Fichiers statiques (HTML, CSS, JS client)
 app.use(express.static(__dirname));
 
-// ---------- UPLOAD MULTER ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1e9) + path.extname(file.originalname))
+// ============================================================
+// CLOUDINARY — Upload d'images
+// ============================================================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'nigershop',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+    transformation: [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }]
+  }
+});
+
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Seules les images sont autorisées'));
-  }
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // ============================================================
@@ -340,6 +346,7 @@ app.get('/api/produits/:id', (req, res) => {
 app.post('/api/produits', auth, adminOnly, upload.array('images', 10), (req, res) => {
   const { nom, description, prix, ancien_prix, stock, categorie } = req.body;
   if (!nom || !prix) return res.status(400).json({ message: 'Nom et prix requis' });
+
   db.run(
     `INSERT INTO produits (nom,description,prix,ancien_prix,stock,categorie,vendeur_id)
      VALUES (?,?,?,?,?,?,?)`,
@@ -347,9 +354,14 @@ app.post('/api/produits', auth, adminOnly, upload.array('images', 10), (req, res
     function (err) {
       if (err) return res.status(500).json({ message: 'Erreur' });
       const pid = this.lastID;
+
       if (req.files?.length) {
-        req.files.forEach((f, i) => db.run('INSERT INTO produit_images (produit_id,url,ordre) VALUES (?,?,?)', [pid, '/uploads/' + f.filename, i]));
+        req.files.forEach((f, i) => db.run(
+          'INSERT INTO produit_images (produit_id,url,ordre) VALUES (?,?,?)',
+          [pid, f.path, i]
+        ));
       }
+
       res.json({ id: pid });
     }
   );
@@ -357,16 +369,22 @@ app.post('/api/produits', auth, adminOnly, upload.array('images', 10), (req, res
 
 app.put('/api/produits/:id', auth, adminOnly, upload.array('images', 10), (req, res) => {
   const { nom, description, prix, ancien_prix, stock, categorie } = req.body;
+
   db.run(
     `UPDATE produits SET nom=?, description=?, prix=?, ancien_prix=?, stock=?, categorie=? WHERE id=?`,
     [nom, description, prix, ancien_prix || null, stock, categorie, req.params.id],
     function (err) {
       if (err) return res.status(500).json({ message: 'Erreur' });
+
       if (req.files?.length) {
         db.run('DELETE FROM produit_images WHERE produit_id=?', [req.params.id], () => {
-          req.files.forEach((f, i) => db.run('INSERT INTO produit_images (produit_id,url,ordre) VALUES (?,?,?)', [req.params.id, '/uploads/' + f.filename, i]));
+          req.files.forEach((f, i) => db.run(
+            'INSERT INTO produit_images (produit_id,url,ordre) VALUES (?,?,?)',
+            [req.params.id, f.path, i]
+          ));
         });
       }
+
       res.json({ ok: true });
     }
   );
@@ -374,6 +392,23 @@ app.put('/api/produits/:id', auth, adminOnly, upload.array('images', 10), (req, 
 
 app.delete('/api/produits/:id', auth, adminOnly, (req, res) => {
   db.run('DELETE FROM produits WHERE id=?', [req.params.id], err =>
+    err ? res.status(500).json({ message: 'Erreur' }) : res.json({ ok: true }));
+});
+
+app.post('/api/produits/:id/images', auth, adminOnly, upload.array('images', 10), (req, res) => {
+  const pid = req.params.id;
+  if (!req.files || !req.files.length) return res.status(400).json({ message: 'Aucune image' });
+  req.files.forEach((f, i) => {
+    db.run(
+      'INSERT INTO produit_images (produit_id,url,ordre) VALUES (?,?,?)',
+      [pid, f.path, i]
+    );
+  });
+  res.json({ ok: true });
+});
+
+app.delete('/api/images/:id', auth, adminOnly, (req, res) => {
+  db.run('DELETE FROM produit_images WHERE id=?', [req.params.id], err =>
     err ? res.status(500).json({ message: 'Erreur' }) : res.json({ ok: true }));
 });
 
